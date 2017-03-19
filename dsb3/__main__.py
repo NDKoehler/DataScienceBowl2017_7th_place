@@ -17,10 +17,10 @@ user = getpass.getuser()
 master_config = __import__('master_config_' + user.split('.')[0].split('_')[0]).config
 
 steps = OrderedDict([
-    ('step1', 'resample_lungs')
+    ('step0', 'resample_lungs')
 ])
 
-def main_descr():
+def steps_descr():
     descr = 'choices for step:'
     for key, help in steps.items():
         descr += '\n  {:12}'.format(key) + help
@@ -30,10 +30,14 @@ def main():
     os.environ['CUDA_VISIBLE_DEVICES'] = ','.join([str(i) for i in master_config['GPU_ids']])
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # disable tensorflow info and warning logs
     # --------------------------------------------------------------------------
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter, epilog=main_descr())
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter,
+                                     epilog=steps_descr())
     aa = parser.add_argument
-    aa('step', type=str, help='One of the choices below, either in the form "stepX" or "step_name".')
-    aa('-a, --action', choices=['run', 'eval', 'train'], default='run', help='Action to perform on step (default: run).')
+    aa('step', type=str, 
+       help='One of the choices below, either in the form "stepX" or "step_name".')
+    aa('-a, --action', choices=['run', 'eval', 'train'], default='run',
+       help='Action to perform on step (default: run).')
     args = parser.parse_args()
     # --------------------------------------------------------------------------
     step_name = args.step

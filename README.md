@@ -1,9 +1,8 @@
 
 
-## Features
-* easy to use mit top-level command, z.b. `dsb3 step0` oder `dsb3
-  resample_lungs` fuehrt “step0" aus, `dsb3 step0 —action evaluate` evaluiert
-  den schritt usw.
+### Features
+* easy to use mit top-level command, z.b. `dsb3 step0` oder `dsb3 resample_lungs` 
+  fuehrt “step0" aus, `dsb3 step0 —action evaluate` evaluiert den schritt usw.
 * trennung pipeline und steps, pipeline modul regelt alles uebergeordnete, step
   module sind untergeordnet und muessen bestimmte constraints erfuellen, dadurch
   werden unter anderem parameter automatisch gecheckt, directories und output
@@ -17,16 +16,18 @@
 * ein ordner `checkpoints` im parent vom dsb3 package, der die step struktur
   erfuellt und aus den `tf_models` geschrieben wird, diese regelung wird noch
   verbessert
+* human-readable jsons enable simple checking of json files: [dsb3/hrjson](dsb3/hrjson)
 
-## Contribution Guidelines
+### Contribution Guidelines
 * code nach https://www.python.org/dev/peps/pep-0008/
 * docstrings im numpy/scipy style http://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_numpy.html
 * __kein__ generelles 80-Zeilen limit, weil ihr ja dicke Screens habt, wenn ihr
   euch davon ueberzeugen lasst, wuerds mich allerdings auch freuen, oder zumindest 120
 
-## Tiny highlights
+### Minor updates 
 * meaningful pipeline environment settings
 ```python
 os.environ['CUDA_VISIBLE_DEVICES'] = ','.join([str(i) for i in master_config['GPU_ids']])
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # disable tensorflow info and warning logs
 ```
+* replaced deprecated `tf.initialize_all_variables()` with `tf.global_variables_initializer()`

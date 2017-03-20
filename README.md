@@ -1,4 +1,15 @@
+## dsb3 pipeline
 
+Currently, the pipeline is operated via the script `dsb3.py`. Navigate into the
+repository using `cd` and call
+```
+./dsb3.py --help
+```
+for getting help, or
+```
+./dsb3.py step0
+```
+for running step 0.
 
 ### Features
 * easy to use mit top-level command, z.b. `dsb3 step0` oder `dsb3 resample_lungs` 

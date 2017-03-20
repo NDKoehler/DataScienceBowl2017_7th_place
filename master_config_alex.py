@@ -4,9 +4,6 @@ config = {
 # general parameters
 # ------------------------------------------------------------------------------
 
-# number of patients to process
-    'n_patients_to_process': 1, # 0 means all
-
 # dataset origin and paths
     'dataset_name': 'LUNA16', # 'LUNA16' or 'dsb3'
     'dataset_dir_LUNA16': '/home/alex_wolf/storage/dsb3/data_raw/LUNA16/',
@@ -14,6 +11,7 @@ config = {
     'write_basedir': '/home/alex_wolf/storage/dsb3/data_processed_170320_alex/',
 
 # data splits
+    'random_seed': 17,
     'tr_va_holdout_fractions': [0.2, 0.8, 0], # something like 0.15, 0.7, 0.15
 
 # technical parameters
@@ -40,18 +38,17 @@ config = {
     'gen_prob_maps': {
         'image_shapes': [[304, 304], [320, 320], [352, 352], [384, 384], [400, 400], [416, 416], 
                          [432, 432], [448, 448], [480, 480], [512, 512], [560, 560], [1024, 1024]], # y, x
-                        # valid shape numbers: 256, 304, 320, 352, 384, 400, 416, 448, 464, 480, 496, 512 (dividable by 16)
+                         # valid shape numbers: 256, 304, 320, 352, 384, 400, 416, 448, 464, 480, 496, 512 (dividable by 16)
         'batch_sizes':  [32, 32, 24, 24, 16, 16, 16, 16, 12, 12, 4, 1],
-        'gen_probs_view_angles': [0, 45, -45], # per view_plane (degree)
+        'view_angles': [0, 45, -45], # per view_plane (degree)
+        'view_planes': 'yxz',
         'data_type': 'uint8', # uint8, int16 or float32
         'image_shape_max_ratio': 0.95,
         'checkpoint_dir': './checkpoints/nodule_seg_1mm_128x128_5Channels_multiview',
-        'view_planes': 'yxz',
-        'gpu_fraction': 0.85,
     },
 
-# cluster candidates
-    'cluster_candidates': {
+# gen candidates
+    'gen_candidates': {
         'max_n_candidates_per_patient': 20,
         'padding_candidates': True,
         'threshold_prob_map': 0.2,

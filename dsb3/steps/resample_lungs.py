@@ -7,6 +7,7 @@ import dicom
 import json
 from joblib import Parallel, delayed
 from tqdm import tqdm
+from collections import OrderedDict
 from .. import utils
 from .. import tf_tools
 from .. import pipeline as pipe
@@ -47,7 +48,8 @@ def run(target_spacing_zyx,
     # heterogenous spacing -> homogeneous spacing
     print('... resizing and interpolating scans')
     patients_dict = dict(Parallel(n_jobs=min(pipe.n_CPUs, len(pipe.patients)), verbose=100)(
-                                  delayed(resample_scan)(patient, target_spacing_zyx, data_type) for patient in pipe.patients))
+                                  delayed(resample_scan)(patient, target_spacing_zyx, data_type) 
+                                  for patient in pipe.patients_raw_data_paths))
     print('... segmenting lung wings and cropping the scan')
     for patient, patient_dict in tqdm(patients_dict.items()):
         config = json.load(open(checkpoint_dir + '/config.json'))
@@ -68,7 +70,7 @@ def run(target_spacing_zyx,
         patient_dict['crop_coords_zyx_px'] = []
         patient_dict['crop_shapes_zyx_px'] = []
         # lung_wings segmentation
-        sess, pred_ops, data = tf_tools.load_network(checkpoint_dir, pipe.write_dir)
+        sess, pred_ops, data = tf_tools.load_network(checkpoint_dir)
         n_batches = int(np.ceil(img_array_zyx.shape[0] / batch_size))
         for batch_cnt in range(n_batches):
             batch = (-1) * np.ones([batch_size] + config['image_shape'], dtype=np.float32)
@@ -101,9 +103,9 @@ def run(target_spacing_zyx,
         patients_dict[patient] = patient_dict
         np.save(patient_dict['resampled_lung_path'], img_array_zyx[:, lung_coords[0]:lung_coords[1], lung_coords[2]:lung_coords[3]])
     sess.close()
-    filename = pipe.step_dir + 'results.json'
-    json.dump(patients_dict, open(filename, 'w'), indent=4)
-    print('wrote', filename)
+    results_dict = OrderedDict([('HU_tissue_range', HU_tissue_range)])
+    results_dict.update(patients_dict)
+    pipe.save_step(results_dict)
 
 def get_pre_normed_value_hist(img_array):
     hist,ran = np.histogram(img_array.flatten(), bins=16*5,normed=True, range=[-1000,600])
@@ -120,7 +122,6 @@ def get_img_array_mhd(img_file):
     return img_array_zyx, spacing_zyx, origin_zyx, acquisition_exception
 
 def get_img_array_dcom(img_file):
-
     def load_scan(path):
         patient = path.split('/')[-2]
         slices = [dicom.read_file(path + '/' + s) for s in os.listdir(path)]
@@ -130,8 +131,8 @@ def get_img_array_dcom(img_file):
             logger.warning('Multiple scan exception, different acquisition numbers: {}'.format(unique_ac_nums))
             logger.warning('    Counts: {}'.format(counts))
             logger.warning('    Patient {}'.format(patient))
-            # Selecting the index with the highest number of acquisitions. In case of balanced acquisitions,
-            # selecting the latter. Operation is string compatible.
+            # celecting the index with the highest number of acquisitions. in case of balanced acquisitions,
+            # selecting the latter, operation is string compatible
             selected_acquisition = unique_ac_nums[np.argwhere(counts == np.amax(counts))[-1][0]]
             logger.warning('proceding with most frequent acquisition number {}'.format(selected_acquisition))
             slices = [s for s in slices if s.AcquisitionNumber == selected_acquisition]
@@ -159,14 +160,13 @@ def get_img_array_dcom(img_file):
                     # take the mode value of spacings, or the first value if values are even
                     s.PixelSpacing[i] = np.argmax(np.bincount(cleaned_spacings))
         return slices, acquisition_exception
-
     def get_pixels_hu(slices):
         image = np.stack([s.pixel_array for s in slices])
-        # Convert to int16 (from sometimes int16) should be possible as values should always be low enough (<32k).
+        # convert to int16 (from sometimes int16) should be possible as values should always be low enough (<32k).
         if np.max(image) > np.iinfo(np.int16).max:
             logger.error('Controlled ransformation of pixel array to np.int16 failed: too high values!')
         image = image.astype(np.int16)
-        # Convert to Hounsfield units (HU)
+        # convert to Hounsfield units (HU)
         for slice_number in range(len(slices)):
             intercept = slices[slice_number].RescaleIntercept
             slope = slices[slice_number].RescaleSlope
@@ -175,7 +175,6 @@ def get_img_array_dcom(img_file):
                 image[slice_number] = image[slice_number].astype(np.int16)
             image[slice_number] += np.int16(intercept)
         return np.array(image, dtype=np.int16)
-
     scan, acquisition_exception = load_scan(img_file)
     img_array_zyx = get_pixels_hu(scan) # z, y, x
     spacing_zyx = np.array(list(map(float, ([scan[0].SliceThickness] + scan[0].PixelSpacing)))) # z, y, x
@@ -184,9 +183,9 @@ def get_img_array_dcom(img_file):
 
 def resample_scan(patient, target_spacing_zyx, data_type):
     if pipe.dataset_name == 'LUNA16':
-        img_array_zyx, old_spacing_zyx, origin_zyx, acquisition_exception = get_img_array_mhd(pipe.patients[patient])
+        img_array_zyx, old_spacing_zyx, origin_zyx, acquisition_exception = get_img_array_mhd(pipe.patients_raw_data_paths[patient])
     elif pipe.dataset_name == 'dsb3':
-        img_array_zyx, old_spacing_zyx, origin_zyx, acquisition_exception = get_img_array_dcom(pipe.patients[patient])
+        img_array_zyx, old_spacing_zyx, origin_zyx, acquisition_exception = get_img_array_dcom(pipe.patients_raw_data_paths[patient])
     new_shape_zyx = np.round(img_array_zyx.shape * np.array(old_spacing_zyx) / np.array(target_spacing_zyx))
     resize_factor = new_shape_zyx / img_array_zyx.shape
     new_spacing_zyx = list(np.array(old_spacing_zyx) / np.array(resize_factor))

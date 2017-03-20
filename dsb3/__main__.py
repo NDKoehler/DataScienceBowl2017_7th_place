@@ -17,7 +17,9 @@ user = getpass.getuser()
 master_config = __import__('master_config_' + user.split('.')[0].split('_')[0]).config
 
 steps = OrderedDict([
-    ('step0', 'resample_lungs')
+    ('step0', 'resample_lungs'),
+    ('step1', 'gen_prob_maps'),
+    ('step2', 'gen_candidates'),
 ])
 
 def steps_descr():
@@ -36,8 +38,10 @@ def main():
     aa = parser.add_argument
     aa('step', type=str, 
        help='One of the choices below, either in the form "stepX" or "step_name".')
-    aa('-a, --action', choices=['run', 'eval', 'train'], default='run',
+    aa('-a', '--action', choices=['run', 'eval', 'train'], default='run',
        help='Action to perform on step (default: run).')
+    aa('-n', '--n_patients_to_process', type=int, default=0,
+       help='Choose the number of patients to process, to test the pipeline (default: process all patients).')
     args = parser.parse_args()
     # --------------------------------------------------------------------------
     step_name = args.step
@@ -51,7 +55,7 @@ def main():
     if not os.path.exists('./dsb3/steps/' + step_name + '.py'):
         raise ValueError('Don\'t now any step called ' + step_name +'.')
     # init pipeline
-    pipe.init(master_config)
+    pipe.init_pipe(master_config, args.n_patients_to_process)
     # init step
     pipe.init_step(step_name)
     # run step

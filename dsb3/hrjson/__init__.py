@@ -117,7 +117,7 @@ _default_encoder = JSONEncoder(
 )
 
 def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
-        allow_nan=True, cls=None, indent=None, separators=None,
+        allow_nan=True, cls=None, indent=None, indent_to_level=255, separators=None,
         default=None, sort_keys=False, **kw):
     """Serialize ``obj`` as a JSON formatted stream to ``fp`` (a
     ``.write()``-supporting file-like object).
@@ -171,6 +171,7 @@ def dump(obj, fp, skipkeys=False, ensure_ascii=True, check_circular=True,
             cls = JSONEncoder
         iterable = cls(skipkeys=skipkeys, ensure_ascii=ensure_ascii,
             check_circular=check_circular, allow_nan=allow_nan, indent=indent,
+            indent_to_level=indent_to_level,
             separators=separators,
             default=default, sort_keys=sort_keys, **kw).iterencode(obj)
     # could accelerate with writelines in some versions of Python, at

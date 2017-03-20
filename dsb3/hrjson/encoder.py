@@ -97,7 +97,7 @@ class JSONEncoder(object):
     key_separator = ': '
     def __init__(self, skipkeys=False, ensure_ascii=True,
             check_circular=True, allow_nan=True, sort_keys=False,
-            indent=None, separators=None, default=None):
+            indent=None, indent_to_level=255, separators=None, default=None):
         """Constructor for JSONEncoder, with sensible defaults.
 
         If skipkeys is false, then it is a TypeError to attempt
@@ -127,6 +127,9 @@ class JSONEncoder(object):
         indent level.  An indent level of 0 will only insert newlines.
         None is the most compact representation.
 
+        If specified, `indent_to_level` causes `indent` only to be effective 
+        to this level.
+
         If specified, separators should be an (item_separator, key_separator)
         tuple.  The default is (', ', ': ') if *indent* is ``None`` and
         (',', ': ') otherwise.  To get the most compact JSON representation,
@@ -135,7 +138,6 @@ class JSONEncoder(object):
         If specified, default is a function that gets called for objects
         that can't otherwise be serialized.  It should return a JSON encodable
         version of the object or raise a ``TypeError``.
-
         """
 
         self.skipkeys = skipkeys
@@ -144,6 +146,7 @@ class JSONEncoder(object):
         self.allow_nan = allow_nan
         self.sort_keys = sort_keys
         self.indent = indent
+        self.indent_to_level = indent_to_level
         if separators is not None:
             self.item_separator, self.key_separator = separators
         elif indent is not None:
@@ -246,11 +249,11 @@ class JSONEncoder(object):
             _iterencode = _make_iterencode(
                 markers, self.default, _encoder, self.indent, floatstr,
                 self.key_separator, self.item_separator, self.sort_keys,
-                self.skipkeys, _one_shot)
+                self.skipkeys, _one_shot, self.indent_to_level)
         return _iterencode(o, 0)
 
 def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
-        _key_separator, _item_separator, _sort_keys, _skipkeys, _one_shot,
+        _key_separator, _item_separator, _sort_keys, _skipkeys, _one_shot, indent_to_level=255,
         ## HACK: hand-optimized bytecode; turn globals into locals
         ValueError=ValueError,
         dict=dict,
@@ -276,7 +279,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                 raise ValueError("Circular reference detected")
             markers[markerid] = lst
         buf = '['
-        if _indent is not None:
+        if _indent is not None and _current_indent_level <= indent_to_level:
             _current_indent_level += 1
             newline_indent = '\n' + _indent * _current_indent_level
             separator = _item_separator + newline_indent
@@ -315,7 +318,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                 else:
                     chunks = _iterencode(value, _current_indent_level)
                 yield from chunks
-        if newline_indent is not None:
+        if newline_indent is not None and _current_indent_level <= indent_to_level + 1:
             _current_indent_level -= 1
             yield '\n' + _indent * _current_indent_level
         yield ']'
@@ -332,7 +335,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                 raise ValueError("Circular reference detected")
             markers[markerid] = dct
         yield '{'
-        if _indent is not None:
+        if _indent is not None and _current_indent_level <= indent_to_level:
             _current_indent_level += 1
             newline_indent = '\n' + _indent * _current_indent_level
             item_separator = _item_separator + newline_indent
@@ -394,7 +397,7 @@ def _make_iterencode(markers, _default, _encoder, _indent, _floatstr,
                 else:
                     chunks = _iterencode(value, _current_indent_level)
                 yield from chunks
-        if newline_indent is not None:
+        if newline_indent is not None and _current_indent_level <= indent_to_level + 1:
             _current_indent_level -= 1
             yield '\n' + _indent * _current_indent_level
         yield '}'

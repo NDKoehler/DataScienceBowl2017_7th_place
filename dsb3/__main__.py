@@ -14,7 +14,13 @@ from . import pipeline as pipe
 from . import utils
 sys.path.insert(0, '.')
 user = getpass.getuser()
-master_config = __import__('master_config_' + user.split('.')[0].split('_')[0]).config
+try:
+    master_config = __import__('master_config_' + user.split('.')[0].split('_')[0]).config
+except ImportError as e:
+    raise ImportError(str(e) 
+                      + '\nGenerate your own config file master_config_' 
+                      + user.split('.')[0].split('_')[0] 
+                      + ' in the root of the repo.')
 
 steps = OrderedDict([
     ('step0', 'resample_lungs'),

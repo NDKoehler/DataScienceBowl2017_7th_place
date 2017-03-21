@@ -4,23 +4,13 @@ The DSB3 Pipeline
 This is the general-purpose command-line utility.
 """
 
-import os, sys
+import os, sys, shutil
 import argparse
 import logging
 import getpass
 from collections import OrderedDict
-from importlib import import_module
-from . import pipeline as pipe
+from . import init_pipeline
 from . import utils
-sys.path.insert(0, '.')
-user = getpass.getuser()
-try:
-    master_config = __import__('master_config_' + user.split('.')[0].split('_')[0]).config
-except ImportError as e:
-    raise ImportError(str(e) 
-                      + '\nGenerate your own config file master_config_' 
-                      + user.split('.')[0].split('_')[0] 
-                      + ' in the root of the repo.')
 
 steps = OrderedDict([
     ('step0', 'resample_lungs'),
@@ -28,49 +18,70 @@ steps = OrderedDict([
     ('step2', 'gen_candidates'),
 ])
 
-def steps_descr():
-    descr = 'choices for step:'
-    for key, help in steps.items():
-        descr += '\n  {:12}'.format(key) + help
-    return descr
-
 def main():
-    os.environ['CUDA_VISIBLE_DEVICES'] = ','.join([str(i) for i in master_config['GPU_ids']])
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # disable tensorflow info and warning logs
     # --------------------------------------------------------------------------
+    # import the master_config
+    user_first_name = getpass.getuser().split('.')[0].split('_')[0]
+    params_user = 'params_' + user_first_name + '.py'
+    if not os.path.exists(params_user):
+        raise FileNotFoundError('Provide file ' 
+                                + params_user 
+                                + ' in the root of the repository.')
+    shutil.copyfile(params_user, 'dsb3/params.py')
+    print('... copied', params_user, 'to', 'dsb3/params.py')
+    from . import params
+    # --------------------------------------------------------------------------
+    # command line parameters
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter,
                                      epilog=steps_descr())
     aa = parser.add_argument
     aa('step', type=str, 
-       help='One of the choices below, either in the form "stepX" or "step_name".')
-    aa('-a', '--action', choices=['run', 'eval', 'train'], default='run',
-       help='Action to perform on step (default: run).')
+       help='One of the choices below, either as "stepX" or "step_name" '
+            'or concatenated, for example, "step0,step1,step2" or "foo_name,bar_name".')
+    aa('-a', '--action', choices=['run', 'vis', 'all'], default='run',
+       help='"run" runs the step making predictions. '
+            '"vis" visualizes the results of the step. '
+            '"all" does everything. (default: "run").')
     aa('-n', '--n_patients_to_process', type=int, default=0,
        help='Choose the number of patients to process, to test the pipeline (default: process all patients).')
     args = parser.parse_args()
+    if ',' in args.step:
+        step_names = args.step.split(',')
+    else:
+        step_names = [args.step]
     # --------------------------------------------------------------------------
-    step_name = args.step
     # some checks
-    if step_name not in steps and step_name not in set(steps.values):
-        raise ValueError()
-    if step_name in steps:
-        step_name = steps[step_name]
-    if step_name not in master_config:
-        raise ValueError('Provide a parameter dict for step ' + step_name + ' in master_config_ ' + user + '!')
-    if not os.path.exists('./dsb3/steps/' + step_name + '.py'):
-        raise ValueError('Don\'t now any step called ' + step_name +'.')
+    for istep, step_name in enumerate(step_names):
+        if step_name not in steps and step_name not in set(steps.values):
+            raise ValueError()
+        if step_name in steps:
+            step_name = steps[step_name]
+            step_names[istep] = step_name
+        if not hasattr(params, step_name):
+            raise ValueError('Provide a parameter dict for step '
+                             + step_name + ' in params_ ' + user_first_name + '!')
+        if not os.path.exists('./dsb3/steps/' + step_name + '.py'):
+            raise ValueError('Do not know any step called ' + step_name +'.')
+    # --------------------------------------------------------------------------
+    # overwrite default params
+    if args.n_patients_to_process > 0:
+        params.pipe['n_patients_to_process'] = args.n_patients_to_process
+    # --------------------------------------------------------------------------
     # init pipeline
-    pipe.init_pipe(master_config, args.n_patients_to_process)
-    # init step
-    pipe.init_step(step_name)
-    # run step
-    step = import_module('.steps.' + step_name, 'dsb3')
-    try:
-        step.run(**master_config[step_name])
-    except TypeError as e:
-        if 'run() got an unexpected keyword argument' in str(e):
-            raise TypeError(str(e) + '\n Provide one of the valid parameters\n' + step.run.__doc__)
-        else:
-            raise e
-    pipe.logger.info('finished step ' + step_name)
+    init_pipeline(**params.pipe)
+    # now we can import `pipeline` from anywhere and use its attributes
+    # --> plays the role of a class with only a single instance across the module
+    from . import pipeline as pipe
+    # perform action
+    for step_name in step_names:
+        if args.action == 'run':
+            pipe.run_step(step_name, getattr(params, step_name))
+        elif args.action == 'vis' or args.action == 'all':
+            pipe.vis_step(step_name)
+
+def steps_descr():
+    descr = 'choices for step:'
+    for key, value in steps.items():
+        descr += '\n  {:12}'.format(key) + value
+    return descr

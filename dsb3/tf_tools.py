@@ -10,6 +10,10 @@ def load_network(checkpoint_dir, image_shape=None, reuse=None):
     # global imports
     import tensorflow as tf
     from tensorflow.python.training import saver as tf_saver
+    # in case we have run a tensorflow computation before, we need to reset the
+    # default graph to clear all variables
+    if reuse is None:
+        tf.reset_default_graph()
     # checkpoint imports
     sys.path.append(checkpoint_dir + '/architecture/')
     model = __import__(config['model_name'] + '_model')

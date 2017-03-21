@@ -1,15 +1,25 @@
 ## dsb3 pipeline
 
-Currently, the pipeline is operated via the script `dsb3.py`. Navigate into the
-repository using `cd` and call
+Currently, the pipeline is operated using the top-level wrapper `dsb3.py`.
+
+Navigate into the repository using `cd` and call
 ```
-./dsb3.py --help
+./dsb3.py -h
 ```
 for getting help, or
 ```
 ./dsb3.py step0
+./dsb3.py step0,step1
 ```
-for running step 0.
+for running step 0 or step 0 and step 1, respectively.
+Visualize the result of computation using
+```
+./dsb3.py step0 -a vis
+```
+Run and visualize a sequence of steps
+```
+./dsb3.py step0,step1,step2 -a all
+```
 
 ### Features
 * easy to use mit top-level command, z.b. `dsb3 step0` oder `dsb3 resample_lungs` 

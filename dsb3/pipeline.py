@@ -1,7 +1,11 @@
+"""
+Pipeline variables and functions.
+"""
 import os
-from collections import OrderedDict
 import logging
+import time
 import numpy as np
+from importlib import import_module
 from . import utils
 from . import hrjson as json
 
@@ -17,63 +21,68 @@ step_dir = None
 """Output directory were all processed data of a specifc step is written.
 Is subdirectory of `write_dir`."""
 
-step_dir_data = None
-"""Data directory of step.
-Is subdirectory of `step_dir`."""
-
 patients = None
-"""List of all patients."""
-
-patients_dict = None
-"""Ordered dictionary that stores for each patient id an empty dict."""
+"""List of all patients. Use this to iterate over patients."""
 
 patients_raw_data_path = None
 """Ordered dictionary that stores for each patient id the path to the raw data."""
 
-logger = None
-"""Global logger for the whole pipeline."""
+# logging
+log_pipe = None
+"""Global logger for the whole pipeline.
+Global info on pipeline usage, step runtimes and errors in steps automatically
+go here. File opened in append mode."""
+
+log_step = None
+log = log_step # just a convenience name for authors of step modules
+"""Step logger for the whole pipeline.
+Everything about a specific step goes here. File opened in write mode."""
 
 # technical parameters
 n_CPUs = 1
+"""Number of CPUs to use in multi-threading."""
+
+GPU_ids = None
+"""List of GPU ids for computations."""
+
 GPU_memory_fraction = 0.85
+"""Fraction of memory attributed to GPU computation."""
 
-def init_pipe(config, n_patients_to_process=0):
-    # simply passing the config is not very elegant, but
-    # explicit names collide with the global variables
-    if config['dataset_name'] not in avail_dataset_names:
-        raise ValueError('dataset_name needs to be one of' + str(avail_dataset_names))
-    global dataset_name
-    dataset_name = config['dataset_name']
-    if dataset_name == 'LUNA16':
-        dataset_dir = config['dataset_dir_LUNA16']
-    else:
-        dataset_dir = config['dataset_dir_dsb3']
-    global write_dir
-    write_dir = config['write_basedir'].rstrip('/') + '/' + dataset_name + '/'
-    init_patients(dataset_dir, n_patients_to_process)
-    # logger for the whole pipeline
-    global logger
-    logger = utils.get_logger(write_dir + 'pipe.log', mode='a')
-    # technical parameters
-    global n_CPUs
-    n_CPUs = config['n_CPUs']
-    global GPU_memory_fraction
-    GPU_memory_fraction = config['GPU_memory_fraction']
-    # random seed
-    np.random.seed(config['random_seed'])
-
-def init_step(step_name):
-    # logger
-    logger.info('running step ' + step_name)
-    # create directories, log files etc.
-    global step_dir, step_dir_data
-    step_dir, step_dir_data = get_step_dir(step_name)
+def run_step(step_name, params):
+    log_pipe.info('run step ' + step_name)
+    # output params dict for visual check
+    print('run step', step_name, 'using params')
+    for key, value in params.items():
+        print('    {} = {}'.format(key, value))
+    # create step directories, log files etc.
+    global step_dir
+    step_dir = get_step_dir(step_name)
+    # saving params dict
+    json.dump(params, open(step_dir + 'params.json', 'w'), indent=4, indent_to_level=0)
+    print('wrote', step_dir + 'params.json')
     # data directory of step
-    utils.ensure_dir(step_dir_data)
+    utils.ensure_dir(step_dir + '/data/')
+    utils.ensure_dir(step_dir + '/figs/')
+    # init step logger
+    init_log_step(step_name)
+    # register start time
+    start_time = time.process_time()
+    # import step module
+    step = import_module('.steps.' + step_name, 'dsb3')
+    try:
+        step_dict = step.run(**params)
+    except TypeError as e:
+        if 'run() got an unexpected keyword argument' in str(e):
+            raise TypeError(str(e) + '\n Provide one of the valid parameters\n' + step.run.__doc__)
+        else:
+            raise e
+    if step_dict is not None:
+        save_step(step_dict, step_name)
+    log_pipe.info('finished after ' + time.strftime('%H:%M:%S', time.gmtime(time.process_time() - start_time)))
 
-def save_step(dic, step_name=None):
+def save_step(d, step_name=None):
     step_dir_ = step_dir if step_name is None else write_dir + step_name + '/'
-    json.dump(dic, open(step_dir_ + 'out.json', 'w'), indent=4, indent_to_level=1)
+    json.dump(d, open(step_dir_ + 'out.json', 'w'), indent=4, indent_to_level=1)
     print('wrote', step_dir_ + 'out.json')
 
 def load_step(step_name=None):
@@ -82,10 +91,10 @@ def load_step(step_name=None):
 
 def get_step_dir(step_name):
     step_dir = write_dir + step_name + '/'
-    step_dir_data = write_dir + step_name + '/data/'
-    return step_dir, step_dir_data
+    return step_dir
 
-def init_patients(dataset_dir, n_patients_to_process=0):
+def init_patients(n_patients_to_process=0):
+    from collections import OrderedDict
     filename = write_dir + 'patients_raw_data_paths.json'
     global patients_raw_data_paths
     global patients
@@ -109,10 +118,33 @@ def init_patients(dataset_dir, n_patients_to_process=0):
         utils.ensure_dir(filename)
         json.dump(patients_raw_data_paths, open(filename, 'w'), indent=4)
         print('wrote', filename)
-    global patients_dict
-    patients_dict = OrderedDict([(patient, {}) for patient in patients_raw_data_paths])
     if n_patients_to_process > 0:
         patients = patients[:n_patients_to_process]
-        patients_dict = OrderedDict(list(patients_dict.items())[:n_patients_to_process])
         patients_raw_data_paths = OrderedDict(list(patients_raw_data_paths.items())[:n_patients_to_process])
     print('... processing', len(patients), 'patients')
+
+def init_log(level=logging.INFO):
+    global log_pipe
+    filename = write_dir + 'log.txt'
+    log_pipe = logging.getLogger(filename)
+    log_pipe.setLevel(level) # it's necessary to set the level also here
+    log_pipe= _add_file_handle_to_log(log_pipe, filename, 'a', level)
+    open(filename, 'a').write('\n')
+
+def init_log_step(step_name, level=logging.INFO):
+    global log_step
+    filename = step_dir + 'log.txt'
+    log_step = logging.getLogger(filename)
+    log_step.setLevel(level) # it's necessary to set the level also here
+    log_step = _add_file_handle_to_log(log_step, filename, 'w', level)
+    # write errors also to pipeline log file
+    filename = write_dir + 'log.txt'
+    log_step = _add_file_handle_to_log(log_step, filename, 'a', logging.WARNING)
+
+def _add_file_handle_to_log(logger, filename, mode, level):
+    fileh = logging.FileHandler(filename, mode)
+    fileh.setLevel(level)
+    fileh.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s | %(message)s', datefmt='%Y-%m-%d %H:%M'))
+    logger.addHandler(fileh)
+    logger.propagate = False
+    return logger

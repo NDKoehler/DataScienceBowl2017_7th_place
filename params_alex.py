@@ -5,7 +5,7 @@ from collections import OrderedDict
 # ------------------------------------------------------------------------------
 
 pipe = OrderedDict([
-    ('n_patients_to_process', 1), # number of patients to process, 0 means all
+    ('n_patients', 1), # number of patients to process, 0 means all
 # dataset origin and paths
     ('dataset_name', 'LUNA16'), # 'LUNA16' or 'dsb3'
     ('dataset_dirs', {
@@ -84,10 +84,13 @@ gen_submission = OrderedDict([
 # ------------------------------------------------------------------------------
 
 gen_nodule_masks = OrderedDict([
+    ('reduced_mask_radius_fraction', 0.5),
+    ('mask2pred_lower_radius_limit_px', 3),
+    ('mask2pred_upper_radius_limit_px', 15),
+    ('LUNA16_annotations_csv_path', '../dsb3a_assets/LIDC-annotations_2_nodule-seg_annotations/annotations_min+missing_LUNA16_patients.csv'),
     ('num_minimal_affected_layers', 5),
-    ('generation_yx_buffer_px', 1),
-    ('generation_z_buffer_px', 2),
-    ('nodule_seg_masks', 'nodule_seg_masks'),
+    ('yx_buffer_px', 1),
+    ('z_buffer_px', 2),
 ])
 
 gen_nodule_seg = OrderedDict([

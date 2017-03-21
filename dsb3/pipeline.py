@@ -21,6 +21,9 @@ step_dir = None
 """Output directory were all processed data of a specifc step is written.
 Is subdirectory of `write_dir`."""
 
+n_patients = None
+"""Number of patients."""
+
 patients = None
 """List of all patients. Use this to iterate over patients."""
 
@@ -57,14 +60,15 @@ def run_step(step_name, params):
     # create step directories, log files etc.
     global step_dir
     step_dir = get_step_dir(step_name)
-    # saving params dict
-    json.dump(params, open(step_dir + 'params.json', 'w'), indent=4, indent_to_level=0)
-    print('wrote', step_dir + 'params.json')
     # data directory of step
     utils.ensure_dir(step_dir + '/data/')
     utils.ensure_dir(step_dir + '/figs/')
+    # saving params dict
+    json.dump(params, open(step_dir + 'params.json', 'w'), indent=4, indent_to_level=0)
+    print('wrote', step_dir + 'params.json')
     # init step logger
     init_log_step(step_name)
+    log.error('test')
     # register start time
     start_time = time.process_time()
     # import step module
@@ -93,7 +97,7 @@ def get_step_dir(step_name):
     step_dir = write_dir + step_name + '/'
     return step_dir
 
-def init_patients(n_patients_to_process=0):
+def init_patients():
     from collections import OrderedDict
     filename = write_dir + 'patients_raw_data_paths.json'
     global patients_raw_data_paths
@@ -118,10 +122,13 @@ def init_patients(n_patients_to_process=0):
         utils.ensure_dir(filename)
         json.dump(patients_raw_data_paths, open(filename, 'w'), indent=4)
         print('wrote', filename)
-    if n_patients_to_process > 0:
-        patients = patients[:n_patients_to_process]
-        patients_raw_data_paths = OrderedDict(list(patients_raw_data_paths.items())[:n_patients_to_process])
-    print('... processing', len(patients), 'patients')
+    global n_patients
+    if n_patients > 0:
+        patients = patients[:n_patients]
+        patients_raw_data_paths = OrderedDict(list(patients_raw_data_paths.items())[:n_patients])
+    else:
+        n_patients = len(patients)
+    print('... processing', n_patients, 'patients')
 
 def init_log(level=logging.INFO):
     global log_pipe
@@ -132,7 +139,7 @@ def init_log(level=logging.INFO):
     open(filename, 'a').write('\n')
 
 def init_log_step(step_name, level=logging.INFO):
-    global log_step
+    global log_step, log
     filename = step_dir + 'log.txt'
     log_step = logging.getLogger(filename)
     log_step.setLevel(level) # it's necessary to set the level also here
@@ -140,6 +147,7 @@ def init_log_step(step_name, level=logging.INFO):
     # write errors also to pipeline log file
     filename = write_dir + 'log.txt'
     log_step = _add_file_handle_to_log(log_step, filename, 'a', logging.WARNING)
+    log = log_step
 
 def _add_file_handle_to_log(logger, filename, mode, level):
     fileh = logging.FileHandler(filename, mode)

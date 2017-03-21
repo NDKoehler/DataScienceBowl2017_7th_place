@@ -16,6 +16,7 @@ steps = OrderedDict([
     ('step0', 'resample_lungs'),
     ('step1', 'gen_prob_maps'),
     ('step2', 'gen_candidates'),
+    ('step4', 'gen_nodule_masks'),
 ])
 
 def main():

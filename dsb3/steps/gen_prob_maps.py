@@ -37,14 +37,14 @@ def run(data_type,
     # split patients by scan_shape for the nodule_segmentation_nets with distinct image_shapes -> save computing time
     net_numbers_with_patients = [[] for n in range(len(image_shapes))]
     registered_patients = set()
-    resample_lungs_result = pipe.load_step('resample_lungs')
-    HU_tissue_range = resample_lungs_result['HU_tissue_range']
+    resample_lungs_dict = pipe.load_step('resample_lungs')
+    HU_tissue_range = resample_lungs_dict['HU_tissue_range']
     for net_num, net_shape in enumerate(image_shapes):
         ratio = 1 if net_num == len(image_shapes) - 1 else image_shape_max_ratio # for avoiding border effects net due to padding, ...
         for patient in pipe.patients:
             if patient in registered_patients:
                 continue
-            scan_shape = resample_lungs_result[patient]['resampled_scan_shape_zyx_px']
+            scan_shape = resample_lungs_dict[patient]['resampled_scan_shape_zyx_px']
             if (scan_shape[1] < int(ratio * net_shape[0]) and scan_shape[1] < int(ratio * net_shape[1]) 
                 and scan_shape[2] < int(ratio * net_shape[0]) and scan_shape[2] < int(ratio * net_shape[1])):
                 net_numbers_with_patients[net_num].append(patient)
@@ -52,9 +52,8 @@ def run(data_type,
     if len(registered_patients) != len(pipe.patients):
         raise ValueError('Registering patients for different nets is inconsistent.')
     print('patients distribution on nets:', [len(l) for l in net_numbers_with_patients])
-    view_planes = sorted(view_planes, reverse=False) # zyx loop first over z because than no img_array.swap_axes is needed
     # loop over nodule_segmentation_nets with distinct image_shapes
-    patients_dict = pipe.patients_dict
+    patients_dict = {}
     reuse_init = True
     for net_num, net_shape in tqdm(enumerate(image_shapes)):
         if len(net_numbers_with_patients[net_num]) == 0:
@@ -71,12 +70,11 @@ def run(data_type,
         print('predicting with net {} with x-y image shape {}'.format(net_num, net_shape))
         # loop over patients in nets list
         for patient in net_numbers_with_patients[net_num]:
-            org_img_array = np.load(resample_lungs_result[patient]['resampled_lung_path']) # z, y, x
-            # print(org_img_array.shape)
+            org_img_array = np.load(resample_lungs_dict[patient]['resampled_lung_path']) # z, y, x
             prob_map = np.zeros_like(org_img_array, dtype=np.float32)
             for view_plane_cnt, view_plane in enumerate(view_planes):
                 if view_plane_cnt > 0: # reload
-                    org_img_array = np.load(resample_lungs_result[patient]['resampled_lung_path']) # z, y, x
+                    org_img_array = np.load(resample_lungs_dict[patient]['resampled_lung_path']) # z, y, x
                 if org_img_array.dtype == np.int16: # [0, 1400] -> [-0.25, 0.75] normalized and zero_centered
                     org_img_array = (org_img_array/(HU_tissue_range[1] - HU_tissue_range[0]) - 0.25).astype(np.float32)
                 if view_plane == 'z':
@@ -85,85 +83,73 @@ def run(data_type,
                     org_img_array = np.swapaxes(org_img_array, 1, 2) # z, x, y
                 elif view_plane == 'x':
                     org_img_array = np.swapaxes(org_img_array, 2, 0) # x, z, y ??? why do we have to do this?
-                # print('org_img_array', org_img_array.shape)
-                # embed img in xy center in image_shape
+                # for example, if view_plane == 'z', then the 'z' dimension becomes the third dimension in img_array
+                #              and the convolution is performed in the first two dimensions, here the y-x dimensions
                 img_array = (-0.25) * np.ones((image_shape[0], image_shape[1], org_img_array.shape[2]), dtype=np.float32) # 'black' array
-                embed_coords_y = int((img_array.shape[0] - org_img_array.shape[0])/2)
-                embed_coords_x = int((img_array.shape[1] - org_img_array.shape[1])/2)
-                img_array[embed_coords_y : embed_coords_y + org_img_array.shape[0],
-                          embed_coords_x : embed_coords_x + org_img_array.shape[1], :] = org_img_array
+                # embed img in xy center in image_shape
+                offset_y = int((img_array.shape[0] - org_img_array.shape[0])/2)
+                offset_x = int((img_array.shape[1] - org_img_array.shape[1])/2)
+                img_array[offset_y : offset_y + org_img_array.shape[0],
+                          offset_x : offset_x + org_img_array.shape[1], :] = org_img_array
                 num_batches = int(np.ceil(img_array.shape[2] / batch_size))
                 batch = (-0.25) * np.ones(([batch_size] + image_shape), dtype=np.float32)
                 batch_rot = batch.copy()
                 for batch_cnt in range(num_batches):
-                    batch[:]          = -0.25 # reset to black
-                    batch_rot[:]      = -0.25 # reset to black
-                    prediction[:]     = 0     # reset to black
-                    prediction_rot[:] = 0     # reset to black
-                    # fill batch
-                    for cnt in range(batch_size):
-                        layer_cnt = cnt + batch_size * batch_cnt
-                        if layer_cnt >= img_array.shape[2]: break
+                    batch[:] = batch_rot[:] = -0.25 # reset to black
+                    prediction[:] = prediction_rot[:] = 0 # reset to 0
+                    for cnt in range(batch_size): # fill batch
+                        layer_cnt = batch_cnt * batch_size + cnt
+                        if layer_cnt >= img_array.shape[2]:
+                            break
                         # leave some channels above empty at top and below at bottom
-                        min_z = max(0, int(layer_cnt - (image_shape[2]-1)/2))
-                        max_z = min(int(layer_cnt + (image_shape[2]-1)/2) + 1, img_array.shape[2])
-                        batch_idx_z = [image_shape[2] - max(0, max_z-min_z), image_shape[2] - min(0, max_z-min_z)]
+                        min_z = max(0, int(layer_cnt - (image_shape[2] - 1) / 2))
+                        max_z = min(int(layer_cnt + (image_shape[2] - 1) / 2) + 1, img_array.shape[2])
+                        batch_idx_z = [image_shape[2] - max(0, max_z - min_z), image_shape[2] - min(0, max_z - min_z)]
                         batch[cnt, :, :, batch_idx_z[0]:batch_idx_z[1]] = img_array[:, :, min_z:max_z]
-                    randy = np.random.randint(0,1000)
-                    # loop over view_angles
                     for view_angle in view_angles:
-                        # rot batch
                         if view_angle != 0:
                             M = cv2.getRotationMatrix2D((batch.shape[2]//2, batch.shape[1]//2), view_angle, 1)
                             for img_cnt in range(batch.shape[0]):
-                                batch_rot[img_cnt] = rotate_3d(((batch[img_cnt].copy() + 0.25)*255).astype(np.uint8), M, 2)/255 - 0.25
+                                batch_rot[img_cnt] = rotate_3d(((batch[img_cnt].copy() + 0.25) * 255).astype(np.uint8), M, 2)/255 - 0.25
                         else:
                             batch_rot = batch.copy()
-                        # get segmentation for noduls and reshape flat prediction to batchsize, z, x, 1
-                        prediction_rot = np.reshape(sess.run(pred_ops, feed_dict = {data['images']: batch_rot})['probs'], prediction.shape)                        
+                        # get probability for nodules and reshape flat prediction to batchsize, z, x, 1
+                        prediction_rot = np.reshape(sess.run(pred_ops, feed_dict = {data['images']: batch_rot})['probs'], prediction.shape)
+                        # below, np.clip is called, shouldn't the prediction stay above zero and below one?
+                        if np.max(prediction_rot) > 1 or np.min(prediction_rot) < 0:
+                            pipe.log.warning('prediction not within [0, 1] for patient ' + patient)
                         # rotate back prediction
                         if view_angle != 0:
                             M_back = cv2.getRotationMatrix2D((prediction_rot.shape[2]//2, prediction_rot.shape[1]//2), -view_angle, 1)
                             for img_cnt in range(batch.shape[0]):
-                                prediction_rot[img_cnt] = np.clip(rotate_3d((prediction_rot[img_cnt]*255).astype(np.uint8), M_back, 2)/255, 0, 1)
+                                prediction_rot[img_cnt] = np.clip(rotate_3d((prediction_rot[img_cnt] * 255).astype(np.uint8), M_back, 2) / 255, 0, 1)
                         # mean over view_angles
                         prediction += prediction_rot / len(view_angles)
-                    # if img_shape != label_shape resizeing etc needed -> probability map has value range [0.0, 1.0]
-                    if np.min(prediction) < 0 or np.max(prediction) > 1:
-                         pipe.logger.error('nodule prediciton not in value range [0, 1] for patient ' + patient)
                     # crop from embedded layers
-                    # print('prediction', prediction.shape)
-                    prediction_embed = prediction[:, 
-                                                     embed_coords_y : embed_coords_y + org_img_array.shape[0],
-                                                     embed_coords_x : embed_coords_x + org_img_array.shape[1]] / len(view_planes)
-                    # print('prediction_embed', prediction_embed.shape)
+                    prediction_embed = prediction[:, offset_y : offset_y + org_img_array.shape[0],
+                                                     offset_x : offset_x + org_img_array.shape[1]] / len(view_planes)
                     layer_start = batch_size * batch_cnt
-                    # insert prob_map layer, swaping axis in right order
-                    layer_end = min(img_array.shape[2], layer_start + batch_size)
-                    if view_plane == 'z': # in the next line, i would like to do rollaxis(..., 2, 0)
-                        # print('z', prob_map[:, :, layer_start:layer_end].shape, prediction_embed[:layer_end-layer_start, :, :, 0].shape)
-                        prob_map[:, :, layer_start:layer_end] += np.swapaxes(prediction_embed[:layer_end-layer_start, :, :, 0], 0, 2) # y, x, z -> z, y, x ?!? 
-                    elif view_plane == 'y': # here, i would like to do np.swapaxes(prediction_embed[:layer_end-layer_start, :, :, 0], 2, 1)
-                        # print('y', prob_map[:, layer_start:layer_end, :].shape, prediction_embed[:layer_end-layer_start, :, :, 0].shape)
-                        prob_map[:, layer_start:layer_end, :] += np.swapaxes(prediction_embed[:layer_end-layer_start, :, :, 0], 0, 1)  # z, x, y -> z, y, x ?!?
-                    elif view_plane == 'x': # here, i would like to leave it as is, prediction_embed[:layer_end-layer_start, :, :, 0]
-                        # print('x', prob_map[layer_start:layer_end, :, :].shape, prediction_embed[:layer_end-layer_start, :, :, 0].shape)
-                        prob_map[layer_start:layer_end, :, :] +=  np.swapaxes(prediction_embed[:layer_end-layer_start, :, :, 0], 1, 2) # z, y, x
-            # if img_shape != label_shape resizeing etc needed -> probability map has value range [0.0, 1.0]
+                    layer_end = min(img_array.shape[2], batch_size + layer_start)
+                    # TODO: is the following correct?
+                    if view_plane == 'z':
+                        prob_map[:, :, layer_start:layer_end] += np.swapaxes(prediction_embed[:layer_end-layer_start, :, :, 0], 0, 2)
+                    elif view_plane == 'y':
+                        prob_map[:, layer_start:layer_end, :] += np.swapaxes(prediction_embed[:layer_end-layer_start, :, :, 0], 0, 1)
+                    elif view_plane == 'x':
+                        prob_map[layer_start:layer_end, :, :] +=  np.swapaxes(prediction_embed[:layer_end-layer_start, :, :, 0], 1, 2)
             if np.min(prob_map) < 0 or np.max(prob_map) > 1:
-                 pipe.logger.error('nodule seg prob_map not in value range [0, 1] for patient ' + patient)
+                 pipe.log.warning('nodule seg prob_map not in value range [0, 1] for patient ' + patient)
             if data_type == 'uint8':
                 prob_map = (prob_map * 255).astype(np.uint8)
             elif data_type == 'uint16':
                 prob_map = (prob_map * 65535).astype(np.uint16)
-            patients_dict[patient]['prob_map_path'] = pipe.step_dir + '/' + patient + '_prob_map.npy'
+            patients_dict[patient] = {'prob_map_path': pipe.step_dir + 'data/' + patient + '_prob_map.npy'}
             np.save(patients_dict[patient]['prob_map_path'], prob_map)
         sess.close()
-    pipe.save_step(patients_dict)
+    return patients_dict
 
 def rotate(in_tensor, M):
-    dst = cv2.warpAffine(in_tensor, M, 
-                         (in_tensor.shape[1], in_tensor.shape[0]), 
+    dst = cv2.warpAffine(in_tensor, M, (in_tensor.shape[1], in_tensor.shape[0]), 
                          flags=cv2.INTER_CUBIC)
     if len(dst) == 2:
         dst = np.expand_dims(dst, 2)

@@ -12,6 +12,7 @@ import logging
 from tqdm import tqdm
 from joblib import Parallel, delayed
 from .. import pipeline as pipe
+from .. import params
 
 def run(max_n_candidates_per_patient,
         threshold_prob_map,
@@ -19,12 +20,7 @@ def run(max_n_candidates_per_patient,
         cube_shape):
     sort_clusters_by = 'prob_sum_min_nodule_size'
     if pipe.dataset_name == 'dsb3':
-        # the following is a terrible hack, solve it differently
-        import getpass
-        user = getpass.getuser()
-        sys.path.insert(0, '.')
-        master_config = __import__('master_config_' + user.split('.')[0].split('_')[0]).config
-        dsb3_labels = pd.read_csv('/'.join(master_config['dataset_dir_dsb3'].split('/')[:-2]) + '/stage1_labels.csv')
+        dsb3_labels = pd.read_csv('/'.join(params.pipe['dataset_dir']['dsb3'].split('/')[:-2]) + '/stage1_labels.csv')
     elif pipe.dataset_name == 'LUNA16':
         try: # the following is needed to get nodule positions
             nodules_masks_result = pipe.load_step('nodules_masks')

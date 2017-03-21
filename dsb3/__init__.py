@@ -4,12 +4,12 @@ import numpy as np
 def init_pipeline(dataset_name,
                   dataset_dirs,
                   write_basedir,
-                  random_seed=17,
+                  n_patients=0,
                   tr_va_holdout_fractions=None,
+                  random_seed=17,
                   n_CPUs=1,
                   GPU_ids=None,
-                  GPU_memory_fraction=0.85,
-                  n_patients_to_process=0):
+                  GPU_memory_fraction=0.85):
     """
     Initialize pipeline.
     """
@@ -19,15 +19,16 @@ def init_pipeline(dataset_name,
     pipe.dataset_name = dataset_name
     pipe.dataset_dir = dataset_dirs[dataset_name]
     pipe.write_dir = write_basedir.rstrip('/') + '/' + dataset_name + '/'
+    pipe.n_patients = n_patients
     # locate input data files and init patient lists
-    pipe.init_patients(n_patients_to_process)
+    np.random.seed(random_seed)
+    pipe.init_patients()
     # logger for the whole pipeline, to be invoked by `pipe.log.info(msg)`, for example
     pipe.init_log()
     # technical parameters
     pipe.n_CPUs = n_CPUs
     pipe.GPU_memory_fraction = GPU_memory_fraction
     pipe.GPU_ids = GPU_ids
-    np.random.seed(random_seed)
     # --------------------------------------------------------------------------
     # environment variables
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # disable tensorflow info and warning logs

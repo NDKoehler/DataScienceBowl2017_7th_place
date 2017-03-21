@@ -12,8 +12,6 @@ from .. import utils
 from .. import tf_tools
 from .. import pipeline as pipe
 
-logger = None # use this for logging
-
 def run(target_spacing_zyx,
         bounding_box_buffer_yx_px,
         data_type,
@@ -39,8 +37,6 @@ def run(target_spacing_zyx,
     seg_max_shape_yx : list of int
         [512, 512]
     """
-    global logger
-    logger = utils.get_logger(pipe.step_dir + 'step.log')
     if data_type not in ['float32', 'int16']:
         raise ValueError('Invalid data_type. Use int16 or float32.')
     if not os.path.exists(checkpoint_dir):
@@ -48,8 +44,8 @@ def run(target_spacing_zyx,
     # heterogenous spacing -> homogeneous spacing
     print('... resizing and interpolating scans')
     patients_dict = dict(Parallel(n_jobs=min(pipe.n_CPUs, len(pipe.patients)), verbose=100)(
-                                  delayed(resample_scan)(patient, target_spacing_zyx, data_type) 
-                                  for patient in pipe.patients_raw_data_paths))
+                                  delayed(resample_scan)(patient, target_spacing_zyx, data_type)
+                                  for patient in pipe.patients))
     print('... segmenting lung wings and cropping the scan')
     for patient, patient_dict in tqdm(patients_dict.items()):
         config = json.load(open(checkpoint_dir + '/config.json'))
@@ -96,16 +92,17 @@ def run(target_spacing_zyx,
                            max(0, min(layers_coords[2]) - bounding_box_buffer_yx_px[1]),
                            min(img_array_zyx.shape[1], max(layers_coords[3]) + bounding_box_buffer_yx_px[1])]
         else:
-            logger.warning('No lung wings found in scan of patient  {}'.format(patient) + '. Taking the whole scan.')
+            pipe.log.warning('No lung wings found in scan of patient  {}'.format(patient) + '. Taking the whole scan.')
             lung_coords = [0, img_array_zyx.shape[0], 0, img_array_zyx.shape[1]]
         patient_dict['bounding_box_coords_yx_px'] = lung_coords
-        patient_dict['resampled_lung_path'] = pipe.step_dir_data + patient + '_img.npy'
+        patient_dict['resampled_lung_path'] = pipe.step_dir + 'data/' + patient + '_img.npy'
         patients_dict[patient] = patient_dict
         np.save(patient_dict['resampled_lung_path'], img_array_zyx[:, lung_coords[0]:lung_coords[1], lung_coords[2]:lung_coords[3]])
     sess.close()
-    results_dict = OrderedDict([('HU_tissue_range', HU_tissue_range)])
-    results_dict.update(patients_dict)
-    pipe.save_step(results_dict)
+    # compile results in dictionary
+    step_dict = OrderedDict([('HU_tissue_range', HU_tissue_range)])
+    step_dict.update(patients_dict)
+    return step_dict
 
 def get_pre_normed_value_hist(img_array):
     hist,ran = np.histogram(img_array.flatten(), bins=16*5,normed=True, range=[-1000,600])
@@ -128,13 +125,13 @@ def get_img_array_dcom(img_file):
         unique_ac_nums, counts = np.unique([s.AcquisitionNumber for s in slices], return_counts = True)
         if len(unique_ac_nums) > 1:
             counts = [int(i) for i in counts]
-            logger.warning('Multiple scan exception, different acquisition numbers: {}'.format(unique_ac_nums))
-            logger.warning('    Counts: {}'.format(counts))
-            logger.warning('    Patient {}'.format(patient))
+            pipe.log.warning('Multiple scan exception, different acquisition numbers: {}'.format(unique_ac_nums))
+            pipe.log.warning('    Counts: {}'.format(counts))
+            pipe.log.warning('    Patient {}'.format(patient))
             # celecting the index with the highest number of acquisitions. in case of balanced acquisitions,
             # selecting the latter, operation is string compatible
             selected_acquisition = unique_ac_nums[np.argwhere(counts == np.amax(counts))[-1][0]]
-            logger.warning('proceding with most frequent acquisition number {}'.format(selected_acquisition))
+            pipe.log.warning('proceding with most frequent acquisition number {}'.format(selected_acquisition))
             slices = [s for s in slices if s.AcquisitionNumber == selected_acquisition]
             acquisition_exception = {}
             multiple_scan_exception = [[str(i) for i in unique_ac_nums], counts]
@@ -142,7 +139,7 @@ def get_img_array_dcom(img_file):
             acquisition_exception['selected_acquisition'] = str(selected_acquisition)
         elif len(unique_ac_nums) == 0:
             acquisition_exception = 'No AcquisitionNumber'
-            logger.warning('Patient {} without acquisition number.'.format(patient))
+            pipe.log.warning('Patient {} without acquisition number.'.format(patient))
         else:
             acquisition_exception = None
         slices.sort(key = lambda x: float(x.ImagePositionPatient[2]))
@@ -164,7 +161,7 @@ def get_img_array_dcom(img_file):
         image = np.stack([s.pixel_array for s in slices])
         # convert to int16 (from sometimes int16) should be possible as values should always be low enough (<32k).
         if np.max(image) > np.iinfo(np.int16).max:
-            logger.error('Controlled ransformation of pixel array to np.int16 failed: too high values!')
+            pipe.log.error('Controlled ransformation of pixel array to np.int16 failed: too high values!')
         image = image.astype(np.int16)
         # convert to Hounsfield units (HU)
         for slice_number in range(len(slices)):
@@ -262,7 +259,7 @@ def seg_preprocessing(img_array_zyx, config, scale_yx, HU_tissue_range):
         img_array_zyx += 0.25
         img_array_zyx *= 255
         if np.max(img_array_zyx >= 256.):
-            logger.error('Data transformation did not work! Observed values greater than 256 before transforming to uint8!')
+            pipe.log.error('Data transformation did not work! Observed values greater than 256 before transforming to uint8!')
         img_array_zyx = img_array_zyx.astype(np.uint8)
     elif img_array_zyx.dtype == np.int16:
         img_array_zyx = ((img_array_zyx / (HU_tissue_range[1] - HU_tissue_range[0])) * 255).astype(np.uint8)
@@ -274,7 +271,7 @@ def seg_preprocessing(img_array_zyx, config, scale_yx, HU_tissue_range):
                                                                                           interpolation=cv2.INTER_AREA)
         # cv2.imwrite('layer{}.jpg'.format(layer_cnt), img_array_zyx_out[layer_cnt, :, :])
     if not len(img_array_zyx_out.shape) == 3:
-        logger.error('wrong shape of img_array_zyx_out in seg_preprocessing.')
+        pipe.log.error('wrong shape of img_array_zyx_out in seg_preprocessing.')
     img_array_zyx_out = np.expand_dims(img_array_zyx_out, 3).astype(np.float32) # expand with channel dimension
     img_array_zyx_out -= 128
     img_array_zyx_out /= 128

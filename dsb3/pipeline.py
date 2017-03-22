@@ -1,7 +1,7 @@
 """
 Pipeline variables and functions.
 """
-import os
+import os, sys
 import logging
 import time
 import numpy as np
@@ -22,6 +22,9 @@ avail_steps = OrderedDict([
     ('step2', 'gen_candidates'),
     ('step4', 'gen_nodule_masks'),
 ])
+
+avail_runs = OrderedDict([])
+"""Stores optimization runs. Is read from file at startup."""
 
 dataset_name = None
 """Either LUNA16 or dsb3."""
@@ -125,26 +128,26 @@ def _get_step_dir_for_load(step_name=None):
 
 def _init_run(next_step_name, run=-1, descr='', init_run=-1):
     runs_filename = write_basedir + dataset_name + '_runs.json'
-    runs_dict = OrderedDict()
     # case run == -1 and the step has already been run before
+    global avail_runs
     if run == -1:
         # there have already been previous runs
         if os.path.exists(runs_filename):
-            runs_dict = json.load(open(runs_filename), object_pairs_hook=OrderedDict)
-            run = int(next(reversed(runs_dict)))
+            avail_runs = json.load(open(runs_filename), object_pairs_hook=OrderedDict)
+            run = int(next(reversed(avail_runs)))
             if descr != '':
                 print('increasing run level to', run + 1)
                 run += 1 # increase run level by one
         else:
             run = 0
-            descr = 'default' if descr == '' else descr
-    # case run > -1: simply update runs_dict
+            descr = 'first_run' if descr == '' else descr
+    # case run > -1: simply update avail_runs
     else:
-        runs_dict = json.load(open(runs_filename), object_pairs_hook=OrderedDict)
-    if runs_dict and descr == '':
-        descr = runs_dict[str(run)][1]
-    runs_dict[str(run)] = [time.strftime('%Y-%m-%d %H:%M', time.localtime()), descr]
-    json.dump(runs_dict, open(runs_filename, 'w'), indent=4, indent_to_level=0)
+        avail_runs = json.load(open(runs_filename), object_pairs_hook=OrderedDict)
+    if avail_runs and descr == '':
+        descr = avail_runs[str(run)][1]
+    avail_runs[str(run)] = [time.strftime('%Y-%m-%d %H:%M', time.localtime()), descr]
+    json.dump(avail_runs, open(runs_filename, 'w'), indent=4, indent_to_level=0)
     # update global variables
     global __run, __init_run, write_dir
     __run = run
@@ -159,7 +162,7 @@ def _init_run(next_step_name, run=-1, descr='', init_run=-1):
 
 def _run_step(step_name, params):
     step_key = [k for (k, v) in avail_steps.items() if v == step_name][0]
-    info = 'run ' + str(__run) + ' / ' + step_key + ' (' + step_name + ')' \
+    info = 'run ' + str(__run) + ' (' + avail_runs[str(__run)][1] + ')' + ' / ' + step_key + ' (' + step_name + ')' \
            + (' with init ' + str(__init_run) if __init_run > -1 else '')
     log_pipe.info(info)
     # output params dict for visual check
@@ -175,7 +178,7 @@ def _run_step(step_name, params):
     utils.ensure_dir(step_dir + 'figs/')
     # init step logger
     _init_log_step(step_name)
-    log.info('start step with ' + ('init ' + str(__init_run)) if __init_run > -1 else 'default init: most recent run, where data is found')
+    log.info('start step with ' + ('init ' + str(__init_run)) if __init_run > -1 else 'default init (most recent run)')
     # saving params dict
     json.dump(params, open(step_dir + 'params.json', 'w'), indent=4, indent_to_level=0)
     # import step module
@@ -189,8 +192,9 @@ def _run_step(step_name, params):
             raise e
     if step_dict is not None:
         save_step(step_dict, step_name)
-    log.info('finished step')
-    log_pipe.info('finished step')
+    finish_msg = '... finished the step'
+    log.info(finish_msg)
+    log_pipe.info(finish_msg)
 
 def _init_patients():
     from collections import OrderedDict
@@ -243,6 +247,11 @@ def _init_log_step(step_name, level=logging.INFO):
     # write errors also to pipeline log file
     filename = get_write_dir()+ 'log.txt'
     log_step = _add_file_handle_to_log(log_step, filename, 'a', logging.WARNING)
+    # write everthing also to stdout
+    ch = logging.StreamHandler()
+    ch.setFormatter(LogFormatter(passed_time=True))
+    log_step.addHandler(ch)
+    # update abbreviation
     log = log_step
     # tensorflow log file
     global log_tf
@@ -251,7 +260,7 @@ def _init_log_step(step_name, level=logging.INFO):
 
 class LogFormatter(logging.Formatter):
     msg  = '%(msg)s'
-    def __init__(self, fmt='%(msg)s', datefmt=None, style='%', passed_time=False):
+    def __init__(self, fmt='%(levelno)s: %(msg)s', datefmt='%Y-%m-%d %H:%M', style='%', passed_time=False):
         super().__init__(fmt, datefmt, style)
         self.passed_time = passed_time
         self.last_time = time.process_time()
@@ -265,8 +274,6 @@ class LogFormatter(logging.Formatter):
             else:
                 self._style._fmt = '%(asctime)s | ' + passed_time_str +  ' - %(msg)s'
             self.last_time = time.process_time()
-        elif record.levelno == logging.ERROR:
-            self._style._fmt = '%(levelno)s: %(msg)s'
         result = logging.Formatter.format(self, record)
         self._style._fmt = format_orig
         return result
@@ -274,6 +281,6 @@ class LogFormatter(logging.Formatter):
 def _add_file_handle_to_log(logger, filename, mode, level, passed_time=False):
     fileh = logging.FileHandler(filename, mode)
     fileh.setLevel(level)
-    fileh.setFormatter(LogFormatter(datefmt='%Y-%m-%d %H:%M', passed_time=passed_time))
+    fileh.setFormatter(LogFormatter(passed_time=passed_time))
     logger.addHandler(fileh)
     return logger

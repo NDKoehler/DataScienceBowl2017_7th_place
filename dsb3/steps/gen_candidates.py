@@ -12,7 +12,6 @@ import logging
 from tqdm import tqdm
 from joblib import Parallel, delayed
 from .. import pipeline as pipe
-from .. import params
 
 def run(max_n_candidates_per_patient,
         threshold_prob_map,
@@ -20,43 +19,42 @@ def run(max_n_candidates_per_patient,
         cube_shape):
     sort_clusters_by = 'prob_sum_min_nodule_size'
     if pipe.dataset_name == 'dsb3':
-        dsb3_labels = pd.read_csv('/'.join(params.pipe['dataset_dir']['dsb3'].split('/')[:-2]) + '/stage1_labels.csv')
+        dsb3_labels = pd.read_csv('/'.join(pipe.raw_data_dir.split('/')[:-2]) + '/stage1_labels.csv')
     elif pipe.dataset_name == 'LUNA16':
-        try: # the following is needed to get nodule positions
-            nodules_masks_result = pipe.load_step('nodules_masks')
+        try: # get nodule positions
+            nodules_masks_dict = pipe.load_step('nodules_masks')
         except FileNotFoundError:
             raise FileNotFoundError('Run gen_nodules_masks first!')
-    out_dir_name = time.strftime('%Y_%m_%d-%H_%M', time.gmtime())
-    out_lst_path_patients = pipe.step_dir + out_dir_name + '.lst'
-    print('saving all_candidates_lst to', out_lst_path_patients)
-    resample_lungs_result = pipe.load_step('resample_lungs')
-    gen_prob_maps_result = pipe.load_step('gen_prob_maps')
+    resample_lungs_dict = pipe.load_step('resample_lungs')
+    gen_prob_maps_dict = pipe.load_step('gen_prob_maps')
     patients_candidates_dict = dict(Parallel(n_jobs=min(pipe.n_CPUs, len(pipe.patients)), verbose=100)(
-                                    delayed(process_patient)(patient, 
-                                                             resample_lungs_result, 
-                                                             gen_prob_maps_result, 
-                                                             label_info=nodules_masks_result if pipe.dataset_name == 'LUNA16' else dsb3_labels) 
+                                    delayed(process_patient)(patient,
+                                                             max_n_candidates_per_patient,
+                                                             resample_lungs_dict, 
+                                                             gen_prob_maps_dict, 
+                                                             label_info=nodules_masks_dict if pipe.dataset_name == 'LUNA16' else dsb3_labels) 
                                     for patient in pipe.patients))
-    out_lst_patients = open(out_lst_path_patients, 'w')
+    patients_lst_path = pipe.get_step_dir() + 'patients.lst'
+    patients_lst = open(patients_lst_path, 'w')
     if pipe.dataset_name == 'LUNA16':
-        out_lst_path_candidates = dataset_dir + '/candidates' + test_suffix + '/' + out_dir_name + '_candidates.lst'
-        out_lst_candidates = open(out_lst_path_candidates, 'w')
+        candidates_lst_path = pipe.get_step_dir() + 'candidates.lst'
+        candidates_lst = open(candidates_lst_path, 'w')
     for patient_cnt, patient in enumerate(tqdm(all_patients)):
-        out_lst_patients.write(patient_candidates_dict[patient]['out_lst'])
+        patients_lst.write(patient_candidates_dict[patient]['out_lst'])
         del patient_candidates_dict[patient]['out_lst']
         if pipe.dataset_name == 'LUNA16':
-            for line in patient_candidates_dict[patient]['out_lst_candidates']:
-                out_lst_candidates.write(line)
-            del patient_candidates_dict[patient]['out_lst_candidates']
-    out_lst_patients.close()
-    if H['data_2_process'] == 'LUNA16':
-        out_lst_candidates.close()
-    pipe.save_step(patients_candidates_dict)
+            for line in patient_candidates_dict[patient]['candidates_lst']:
+                candidates_lst.write(line)
+            del patient_candidates_dict[patient]['candidates_lst']
+    patients_lst.close()
+    print('wrote', patients_lst_path)
+    if pipe.dataset_name == 'LUNA16':
+        candidates_lst.close()
+        print('wrote', candidates_lst_path)
+    return patients_candidates_dict
 
-def process_patient(patient, resample_lungs_result, gen_prob_maps_result, label_info):
-    prob_map_path = resample_lungs_result[patient]['probability_map_path']
-    img_path = gen_prob_maps_result[patient]['resampled_lung_path']
-    prob_map = np.load(prob_map_path)
+def process_patient(patient, max_n_candidates_per_patient, resample_lungs_dict, gen_prob_maps_dict, label_info):
+    prob_map = pipe.load_array(gen_prob_maps_dict[patient]['basename'], 'gen_prob_maps')
     if prob_map.dtype == np.float32:
         prob_map = (255 * prob_map).astype(np.uint8)
     elif prob_map.dtype == np.uint16:
@@ -65,12 +63,12 @@ def process_patient(patient, resample_lungs_result, gen_prob_maps_result, label_
     prob_map_thresh[prob_map_thresh < threshold_prob_map * 255] = 0.0 # here prob_map is in units of 255
     prob_map_idx = np.argwhere(prob_map_thresh)
     # translate to mm units, relative to dummy origin in pixels origin_dummy = [0, 0, 0]
-    prob_map_points_mm = prob_map_idx * resample_lungs_result[patient]['resampled_scan_spacing_yxz_mm']
+    prob_map_points_mm = prob_map_idx * resample_lungs_dict[patient]['resampled_scan_spacing_yxz_mm']
     try:
-        avg_n_points_per_cmm = int(np.round(reduce(lambda x, y: x*y, [1/s for s in resample_lungs_result[patient]['resampled_scan_spacing_yxz_mm']])))
+        avg_n_points_per_cmm = int(np.round(reduce(lambda x, y: x*y, [1/s for s in resample_lungs_dict[patient]['resampled_scan_spacing_yxz_mm']])))
     except:
-        wrong_spacing_warning = ('Wrong resampled spacing data  {}  for patient  {}!'.format(resample_lungs_result[patient]['resampled_scan_spacing_yxz_mm'], patient))
-        pipe.logger.error(wrong_spacing_warning)
+        wrong_spacing_warning = ('Wrong resampled spacing data  {}  for patient  {}!'.format(resample_lungs_dict[patient]['resampled_scan_spacing_yxz_mm'], patient))
+        pipe.log.error(wrong_spacing_warning)
         avg_n_points_per_cmm = 4
 
     prob_map_X_norm = prob_map[prob_map_idx[:, 0], prob_map_idx[:, 1], prob_map_idx[:, 2]] / 255
@@ -81,28 +79,29 @@ def process_patient(patient, resample_lungs_result, gen_prob_maps_result, label_
     # print('found', len(clusters), 'clusters in', len(prob_map_points_mm), 'points')
     clusters = get_candidates_box_coords(clusters, cube_shape, prob_map.shape, padding=padding_candidates)
     clusters = get_candidates_array(clusters, prob_map, 'prob_map', cube_shape, threshold_prob_map)
-
+    # sort clusters, trunkaed clusters, clean the cluster dict
     clusters = sort_clusters(clusters, key=sort_clusters_by)
-    clusters = clusters[:H['max_n_candidates_per_patient']]
+    clusters = clusters[:max_n_candidates_per_patient]
     clusters = remove_masks_from_clusters(clusters)
 
-    img_array = np.load(img_path)
+    img_array = pipe.load_array(resample_lungs_dict[patient]['basename'], 'resample_lungs')
     clusters = get_candidates_array(clusters, img_array.copy(), 'img', cube_shape)
-    patient_dict = {}
+    pa_dict = {}
     # set cancer labels
     if pipe.dataset_name == 'dsb3':
         dsb3_labels = label_info
         if patient in dsb3_labels['id'].values.tolist():
-            patient_dict['cancer_label'] = dsb3_labels['cancer'].loc[dsb3_labels['id'] == patient].tolist()[0]
+            pa_dict['cancer_label'] = dsb3_labels['cancer'].loc[dsb3_labels['id'] == patient].tolist()[0]
         else:
-            patient_dict['cancer_label'] = -1
+            pa_dict['cancer_label'] = -1
+        patient_class = pa_dict['cancer_label']
     # set nodule labels
     else:
         patient_count_nodule_prio_greater_2 = 0
-        patient_dict_nodules_masks = label_info['patients'][patient]
+        pa_dict_nodules_masks = label_info['patients'][patient]
         for clu in clusters:
             clu['nodule_priority'] = 0
-            if not 'nodules' in patient_dict_nodules_masks:
+            if not 'nodules' in pa_dict_nodules_masks:
                 continue
             nodules = label_info['nodules']
             for nodule_idx, nodule in enumerate(nodules):
@@ -113,28 +112,29 @@ def process_patient(patient, resample_lungs_result, gen_prob_maps_result, label_
                     if clu['nodule_priority'] > 2:
                         patient_count_nodule_prio_greater_2 += 1
                         break
-        patients_class = int(patient_count_nodule_prio_greater_2 > 0)
-        patient_dict['nodule_label'] = patients_class
-    patient_dict['clusters'] = [] # this is a sorted list of candidates
-    patient_dict['out_lst_candidates'] = []
+        pa_dict['nodule_label'] = int(patient_count_nodule_prio_greater_2 > 0)
+        patient_class = pa_dict['nodule_label']
+    pa_dict['clusters'] = [] # this is a sorted list of candidates
+    pa_dict['candidates_lst'] = []
     can_img_paths = []
     can_prob_map_paths = []
     for clu_cnt, clu in enumerate(clusters):
-        patient_dict['clusters'].append({})
-        clu_dict = patient_dict['clusters'][clu_cnt]
+        pa_dict['clusters'].append({})
+        clu_dict = pa_dict['clusters'][clu_cnt]
         # save candidate from img_array
-        clu_dict['img_path'] = dataset_dir + 'candidates' + test_suffix + '/' + out_dir_name + '/' + patient + '_%02d_img.npy' % (clu_cnt)
+        clu_dict['img_basename'] = patient + '_%02d_img.npy' % (clu_cnt)
+        clu_dict['img_path'] = pipe.save_array(clu_dict['img_path'], clu['candidate_img_array'].astype(np.float32))
         can_img_paths.append(clu_dict['img_path'])
-        np.save(clu_dict['img_path'], clu['candidate_img_array'].astype(np.float32))
         # save candidate from prob_map
-        clu_dict['prob_map_path'] = dataset_dir + 'candidates' + test_suffix + '/'  + out_dir_name + '/' + patient + '_%02d_prob_map.npy' % (clu_cnt)
+        basename = patient + '_%02d_prob_map.npy'
+        clu_dict['prob_map_basename'] = basename
+        clu_dict['prob_map_path'] = np.save_array(basename, clu['candidate_prob_map_array'].astype(np.float32))
         can_prob_map_paths.append(clu_dict['prob_map_path'])
-        np.save(clu_dict['prob_map_path'], clu['candidate_prob_map_array'].astype(np.float32))
         # check cluster_shape
         if clu['candidate_prob_map_array'].shape != tuple(cube_shape):
-            pipe.logger.error('wrong shape!!! {} for patient  {}'.format(clu['candidate_prob_map_array'].shape, patient))
+            pipe.log.error('Wrong shape {} for patient  {}'.format(clu['candidate_prob_map_array'].shape, patient))
         # save some cluster info
-        clu_dict['prob_max_cluster'] = int(clu['prob_max_cluster']) # is all in units of 255 / int is required by json
+        clu_dict['prob_max_cluster'] = int(clu['prob_max_cluster'])  # is all in units of 255
         clu_dict['prob_sum_cluster'] = int(clu['prob_sum_cluster'])
         clu_dict['prob_sum_candidate'] = int(clu['prob_sum_candidate'])
         clu_dict['prob_sum_min_nodule_size'] = int(clu['prob_sum_min_nodule_size'])
@@ -143,9 +143,9 @@ def process_patient(patient, resample_lungs_result, gen_prob_maps_result, label_
         clu_dict['candidate_box_coords_yxz_px'] = [int(clu['candidate_box_coords'][k]) for k  in ['min_y', 'max_y', 'min_x', 'max_x', 'min_z', 'max_z']]
         # candidate classification info
         if pipe.dataset_name == 'LUNA16':
-            patient_dict['out_lst_candidates'].append('{}_{}\t{}\t{}\t{}\n'.format(patient, clu_cnt, clu['nodule_priority'], clu_dict['img_path'], clu_dict['prob_map_path']))
-    patient_dict['out_lst'] = '{}\t{}\t{}\t{}\n'.format(patient, patients_class, ','.join(can_img_paths), ','.join(can_prob_map_paths))
-    return patient, patient_dict
+            pa_dict['candidates_lst'].append('{}_{}\t{}\t{}\t{}\n'.format(patient, clu_cnt, clu['nodule_priority'], clu_dict['img_path'], clu_dict['prob_map_path']))
+    pa_dict['patients_lst'] = '{}\t{}\t{}\t{}\n'.format(patient, patient_class, ','.join(can_img_paths), ','.join(can_prob_map_paths))
+    return patient, pa_dict
 
 def dbscan(X_mm, X_px, weights, avg_n_points_per_cmm=1):
     """
@@ -268,8 +268,10 @@ def get_candidates_array(clusters, array, array_name, cube_shape, threshold_prob
     total_shape = array.shape
     for clu_cnt, clu in enumerate(clusters):
         coords = clu['candidate_box_coords']
-        if H['resampled_lung_data_type'] != 'int16' or H['gen_prob_maps_data_type'] != 'uint8':
-            raise ValueError('ERROR with datatype - create new option for the datatype you want to use')
+        if array_name == 'img' and array.dtype != np.int16:
+            raise ValueError('Wrong data type.')
+        if array_name == 'prob_map' and array.dtype != np.uint8:
+            raise ValueError('Wrong data type.')
         if array_name=='img':
             clu['candidate_'+array_name+'_array'] = np.zeros(cube_shape, dtype=np.int16)
         elif array_name=='prob_map':

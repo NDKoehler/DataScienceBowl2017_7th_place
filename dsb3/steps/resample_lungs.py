@@ -20,6 +20,8 @@ def run(target_spacing_zyx,
         batch_size,
         seg_max_shape_yx):
     """
+    Writes resized, interpolated and cropped CT scans to disk.
+
     Parameters
     ----------
     target_spacing_zyx : np.ndarray
@@ -36,35 +38,40 @@ def run(target_spacing_zyx,
         Batch size for lung wings segmentation.
     seg_max_shape_yx : list of int
         [512, 512]
+
+    Returns
+    -------
+    out_dict : dict
+        Result dictionary.
     """
     if data_type not in ['float32', 'int16']:
         raise ValueError('Invalid data_type. Use int16 or float32.')
     if not os.path.exists(checkpoint_dir):
         raise ValueError('checkpoint_dir ' + checkpoint_dir + ' does not exist.')
     # heterogenous spacing -> homogeneous spacing
-    print('... resizing and interpolating scans')
+    pipe.log.info('resizing and interpolating scans')
     patients_dict = dict(Parallel(n_jobs=min(pipe.n_CPUs, len(pipe.patients)), verbose=100)(
                                   delayed(resample_scan)(patient, target_spacing_zyx, data_type)
                                   for patient in pipe.patients))
-    print('... segmenting lung wings and cropping the scan')
-    for patient, patient_dict in tqdm(patients_dict.items()):
+    pipe.log.info('segmenting lung wings and cropping the scan')
+    for patient, pa_dict in tqdm(patients_dict.items()):
         config = json.load(open(checkpoint_dir + '/config.json'))
-        img_array_zyx = patient_dict['img_array_zyx']; del patient_dict['img_array_zyx']
+        img_array_zyx = pa_dict['img_array_zyx']; del pa_dict['img_array_zyx']
         pre_norm_value_hist, value_range = get_pre_normed_value_hist(img_array_zyx)
-        patient_dict['pre_normalized_zero-centered_value_histogram'] = [x for x in pre_norm_value_hist]
-        patient_dict['pre_normalized_zero-centered_value_range'] = [x for x in value_range]
+        pa_dict['pre_normalized_zero-centered_value_histogram'] = [x for x in pre_norm_value_hist]
+        pa_dict['pre_normalized_zero-centered_value_range'] = [x for x in value_range]
         img_array_zyx = clip_HU_range(img_array_zyx, HU_tissue_range)
         # lung wings segmentation (max width 512 due to embedding_shape of lungwings_segmentation training_data)
-        seg_max_shape_yx = [int(seg_max_shape_yx[0] / patient_dict['resampled_scan_spacing_zyx_mm'][1]), 
-                            int(seg_max_shape_yx[1] / patient_dict['resampled_scan_spacing_zyx_mm'][2])]
+        seg_max_shape_yx = [int(seg_max_shape_yx[0] / pa_dict['resampled_scan_spacing_zyx_mm'][1]), 
+                            int(seg_max_shape_yx[1] / pa_dict['resampled_scan_spacing_zyx_mm'][2])]
         # value range [-1.0, 1.0] axis [z, y, x, 1]
         scale_yx = [x for x in np.array(config['image_shape'][:2]) / seg_max_shape_yx[:2]] # config['image_shape'] is y, x
         img_array_seg_zyx, crop_coords_seg_yx = seg_preprocessing(img_array_zyx, config, scale_yx, HU_tissue_range)
         # calculate rescaling factor for whole scan
         inverse_scale_yx = [1.0/s for s in scale_yx] # y, x
         # define crop_coords_seg_yx
-        patient_dict['crop_coords_zyx_px'] = []
-        patient_dict['crop_shapes_zyx_px'] = []
+        pa_dict['crop_coords_zyx_px'] = []
+        pa_dict['crop_shapes_zyx_px'] = []
         # lung_wings segmentation
         sess, pred_ops, data = tf_tools.load_network(checkpoint_dir)
         n_batches = int(np.ceil(img_array_zyx.shape[0] / batch_size))
@@ -82,10 +89,10 @@ def run(target_spacing_zyx,
                 crop_coords = get_crop_idx(prediction[layer_in_batch_cnt, :, :, :], crop_coords_seg_yx, inverse_scale_yx)
                 if crop_coords:
                     crop_shape = (int(crop_coords[1] - crop_coords[0]), int(crop_coords[3] - crop_coords[2]), 1)
-                    patient_dict['crop_shapes_zyx_px'] += [crop_shape]
-                    patient_dict['crop_coords_zyx_px'] += [crop_coords]
+                    pa_dict['crop_shapes_zyx_px'] += [crop_shape]
+                    pa_dict['crop_coords_zyx_px'] += [crop_coords]
         # crop bounding_cube around lung wings and save
-        layers_coords = [[coords[x] for coords in patient_dict['crop_coords_zyx_px']] for x in range(4)]
+        layers_coords = [[coords[x] for coords in pa_dict['crop_coords_zyx_px']] for x in range(4)]
         if [True, True, True, True] == [True if len(x) > 0 else False for x in layers_coords]:
             lung_coords = [max(0, min(layers_coords[0]) - bounding_box_buffer_yx_px[0]),
                            min(img_array_zyx.shape[0], max(layers_coords[1]) + bounding_box_buffer_yx_px[0]),
@@ -94,15 +101,16 @@ def run(target_spacing_zyx,
         else:
             pipe.log.warning('No lung wings found in scan of patient  {}'.format(patient) + '. Taking the whole scan.')
             lung_coords = [0, img_array_zyx.shape[0], 0, img_array_zyx.shape[1]]
-        patient_dict['bounding_box_coords_yx_px'] = lung_coords
-        patient_dict['resampled_lung_path'] = pipe.step_dir + 'data/' + patient + '_img.npy'
-        patients_dict[patient] = patient_dict
-        np.save(patient_dict['resampled_lung_path'], img_array_zyx[:, lung_coords[0]:lung_coords[1], lung_coords[2]:lung_coords[3]])
+        pa_dict['bounding_box_coords_yx_px'] = lung_coords
+        pa_dict['basename'] = patient + '_img.npy'
+        pathname = pipe.save_array(pa_dict['basename'], img_array_zyx[:, lung_coords[0]:lung_coords[1], lung_coords[2]:lung_coords[3]])
+        pa_dict['pathname'] = pathname
+        patients_dict[patient] = pa_dict
     sess.close()
     # compile results in dictionary
-    step_dict = OrderedDict([('HU_tissue_range', HU_tissue_range)])
-    step_dict.update(patients_dict)
-    return step_dict
+    out_dict = OrderedDict([('HU_tissue_range', HU_tissue_range)])
+    out_dict.update(patients_dict)
+    return out_dict
 
 def get_pre_normed_value_hist(img_array):
     hist,ran = np.histogram(img_array.flatten(), bins=16*5,normed=True, range=[-1000,600])

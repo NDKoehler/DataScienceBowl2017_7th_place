@@ -38,6 +38,8 @@ def run(data_type,
     net_numbers_with_patients = [[] for n in range(len(image_shapes))]
     registered_patients = set()
     resample_lungs_dict = pipe.load_step('resample_lungs')
+    if isinstance(resample_lungs_dict, FileNotFoundError):
+        raise FileNotFoundError(str(resample_lungs_dict) + '\n--> Run step "resample_lungs" first.')
     HU_tissue_range = resample_lungs_dict['HU_tissue_range']
     for net_num, net_shape in enumerate(image_shapes):
         ratio = 1 if net_num == len(image_shapes) - 1 else image_shape_max_ratio # for avoiding border effects net due to padding, ...
@@ -55,7 +57,7 @@ def run(data_type,
     # loop over nodule_segmentation_nets with distinct image_shapes
     patients_dict = {}
     reuse_init = True
-    for net_num, net_shape in tqdm(enumerate(image_shapes)):
+    for net_num, net_shape in enumerate(tqdm(image_shapes)):
         if len(net_numbers_with_patients[net_num]) == 0:
             continue
         reuse = None if reuse_init else True
@@ -70,11 +72,11 @@ def run(data_type,
         print('predicting with net {} with x-y image shape {}'.format(net_num, net_shape))
         # loop over patients in nets list
         for patient in net_numbers_with_patients[net_num]:
-            org_img_array = np.load(resample_lungs_dict[patient]['resampled_lung_path']) # z, y, x
+            org_img_array = pipe.load_array(resample_lungs_dict[patient]['basename'], step_name='resample_lungs') # z, y, x
             prob_map = np.zeros_like(org_img_array, dtype=np.float32)
             for view_plane_cnt, view_plane in enumerate(view_planes):
                 if view_plane_cnt > 0: # reload
-                    org_img_array = np.load(resample_lungs_dict[patient]['resampled_lung_path']) # z, y, x
+                    org_img_array = pipe.load_array(resample_lungs_dict[patient]['basename']) # z, y, x
                 if org_img_array.dtype == np.int16: # [0, 1400] -> [-0.25, 0.75] normalized and zero_centered
                     org_img_array = (org_img_array/(HU_tissue_range[1] - HU_tissue_range[0]) - 0.25).astype(np.float32)
                 if view_plane == 'z':
@@ -143,8 +145,9 @@ def run(data_type,
                 prob_map = (prob_map * 255).astype(np.uint8)
             elif data_type == 'uint16':
                 prob_map = (prob_map * 65535).astype(np.uint16)
-            patients_dict[patient] = {'prob_map_path': pipe.step_dir + 'data/' + patient + '_prob_map.npy'}
-            np.save(patients_dict[patient]['prob_map_path'], prob_map)
+            patients_dict[patient] = {'basename': patient + '_prob_map.npy'}
+            path_name = pipe.save_array(patients_dict[patient]['basename'], prob_map)
+            patients_dict[patient] = {'pathname': path_name}
         sess.close()
     return patients_dict
 

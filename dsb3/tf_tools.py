@@ -13,8 +13,9 @@ def load_network(checkpoint_dir, image_shape=None, reuse=None):
     from tensorflow.python.training import saver as tf_saver
     # in case we have run a tensorflow computation before, we need to reset the
     # default graph to clear all variables
-    if reuse is None:
-        tf.reset_default_graph()
+    with redirect_stdout():
+        if reuse is None:
+            tf.reset_default_graph()
     # checkpoint imports
     sys.path.append(checkpoint_dir + '/architecture/')
     model = __import__(config['model_name'] + '_model')
@@ -27,13 +28,12 @@ def load_network(checkpoint_dir, image_shape=None, reuse=None):
     config['VARIABLES_TO_RESTORE'] = tf.contrib.slim.get_variables_to_restore()
     config['UPDATE_OPS_COLLECTION'] = tf.GraphKeys.UPDATE_OPS
     init_op = tf.global_variables_initializer()
-    with redirected_stdout():
+    with redirect_stdout():
         sess = tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=pipe.GPU_memory_fraction),
                                                 allow_soft_placement=True,
                                                 log_device_placement=config['allow_soft_placement']))
-    sess.run(init_op)
-    data = {'images': tf.placeholder(dtype=tf.float32, shape=[None] + image_shape, name='image_placeholder')}
-    with redirected_stdout(pipe.log_tf):
+        sess.run(init_op)
+        data = {'images': tf.placeholder(dtype=tf.float32, shape=[None] + image_shape, name='image_placeholder')}
         with tf.device('/gpu:' + os.environ['CUDA_VISIBLE_DEVICES']):
             config['dropout'] = 1.0
             output, endpoints = model(data=data,
@@ -52,22 +52,22 @@ def load_network(checkpoint_dir, image_shape=None, reuse=None):
             pred_ops[key] = output[key]
     if len(pred_ops) != len(config['endpoints']):
         raise ValueError('Not all enpoints found in the graph!: {}'.format(config['endpoints']))
-    # restore checkpoint and create saver
-    ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
-    var_lst = []
-    for var in tf.global_variables():
-        if var.name.split('/')[0] == config['model_name']:
-            var_lst.append(var)
-    saver = tf_saver.Saver(var_lst, write_version=tf.train.SaverDef.V2)
-    with redirected_stdout(pipe.log_tf):
+    with redirect_stdout():
+        # restore checkpoint and create saver
+        ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
+        var_lst = []
+        for var in tf.global_variables():
+            if var.name.split('/')[0] == config['model_name']:
+                var_lst.append(var)
+        saver = tf_saver.Saver(var_lst, write_version=tf.train.SaverDef.V2)
         # the following outputs all variables in the graph from _pywrap_tensorflow.so
         # when calling _pywrap_tensorflow.TF_ExtendGraph
-        # this is why we use redirected_std_out() context manager
+        # this is why we use redirect_std_out() context manager
         saver.restore(sess, ckpt.model_checkpoint_path)
     return sess, pred_ops, data
 
 @contextmanager
-def redirected_stdout(to=os.devnull):
+def redirect_stdout(to=pipe.log_tf):
     """from http://stackoverflow.com/questions/5081657/how-do-i-prevent-a-c-shared-library-to-print-on-stdout-in-python
     """
     fd = sys.stdout.fileno()
@@ -81,7 +81,7 @@ def redirected_stdout(to=os.devnull):
         with open(to, 'w') as file:
             _redirect_stdout(to=file)
         try:
-            yield # allow code to be run with the redirected stdout
+            yield # allow code to be run with the redirect stdout
         finally:
             # restore stdout. buffering and flags such as CLOEXEC may be different
             _redirect_stdout(to=old_stdout)

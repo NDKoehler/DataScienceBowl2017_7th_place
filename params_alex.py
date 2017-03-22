@@ -8,14 +8,14 @@ pipe = OrderedDict([
     ('n_patients', 1), # number of patients to process, 0 means all
 # dataset origin and paths
     ('dataset_name', 'LUNA16'), # 'LUNA16' or 'dsb3'
-    ('dataset_dirs', {
+    ('raw_data_dirs', {
         'LUNA16': '/home/alex_wolf/storage/dsb3/data_raw/LUNA16/',
         'dsb3': '/home/alex_wolf/storage/dsb3/data_raw/dsb3/stage1/',
     }),
-    ('write_basedir', '/home/alex_wolf/storage/dsb3/data_processed_170320_alex/'),
+    ('write_basedir', '/home/alex_wolf/test/'),
 # data splits
     ('random_seed', 17),
-    ('tr_va_holdout_fractions', [0.2, 0.8, 0]), # something like 0.15, 0.7, 0.15
+    ('tr_va_ho_split', [0.2, 0.8, 0]), # something like 0.15, 0.7, 0.15
 # technical parameters
     ('n_CPUs', 7),
     ('GPU_ids', [0]),
@@ -33,6 +33,7 @@ resample_lungs = OrderedDict([
     ('bounding_box_buffer_yx_px', [12, 12]), # y, x
     ('seg_max_shape_yx', [512, 512]), # y, x
     ('batch_size', 64), # 128 for target_spacing 0.5, 64 for target_spacing 1.0
+
     ('checkpoint_dir', './checkpoints/resample_lungs/lung_wings_segmentation'),
 ])
 

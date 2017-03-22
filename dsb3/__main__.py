@@ -28,13 +28,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter,
                                      epilog=steps_descr()+runs_descr(), add_help=False)
-    aa = parser.add_argument_group('Choose "steps" and the actions to take.').add_argument
+    aa = parser.add_argument_group('Choose "steps".').add_argument
     aa('steps', type=str, 
        help='See the choices below, for example, "step0,step1,step2" or "foo_name".')
-    aa('-a', '--action', choices=['go', 'vis', 'all'], default='go', metavar='a',
-       help='"go": run steps and make predictions, '
-            '"vis": visualize the results, '
-            '"all": do both (default: "go").')
     aa = parser.add_argument_group('Manage pipeline "runs", i.e., repeated sequences of "steps"').add_argument
     aa('-r', '--run', type=int, default=-1, metavar='i',
        help='Select a "run" (default: work within current run, only start a new run if "-rd" is provided).')
@@ -66,7 +62,7 @@ def main():
         if not os.path.exists('./dsb3/steps/' + step_name + '.py'):
             raise ValueError('Do not know any step called ' + step_name +'.')
     # --------------------------------------------------------------------------
-    # overwrite default params
+    # overwrite default parameters
     if args.n_patients > 0:
         params.pipe['n_patients'] = args.n_patients
     # --------------------------------------------------------------------------
@@ -76,13 +72,9 @@ def main():
     # --> plays the role of a class with only a single instance across the module
     # init the current run of the pipeline
     pipe._init_run(step_names[0], args.run, args.descr)
-    # perform action
     for step_name in step_names:
-        if args.action == 'go':
-            pipe._run_step(step_name, getattr(params, step_name))
-        elif args.action == 'vis' or args.action == 'all':
-            raise ValueError('not implemented yet')
-            pipe._vis_step(step_name)
+        pipe._run_step(step_name, getattr(params, step_name))
+        # pipe._visualize_step(step_name)
 
 def steps_descr():
     descr = 'Choices for "steps":'

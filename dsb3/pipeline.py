@@ -8,6 +8,7 @@ import numpy as np
 from importlib import import_module
 from collections import OrderedDict
 from . import utils
+from . import visualize as vis
 from . import hrjson as json
 
 # ------------------------------------------------------------------------------
@@ -69,14 +70,21 @@ GPU_memory_fraction = 0.85
 """Fraction of memory attributed to GPU computation."""
 
 # track pipeline runs
-_step_name = None
+__step_name = None
 """Stores which step is currently processed."""
 
 __run = 0
 """Integer that identifies the current run of the pipeline."""
 
-__init_run = 0
-"""Integer that identifies the run that is used to initialize the current run."""
+__init_run = -1
+"""Integer that identifies the run that is used to initialize the current run.
+
+When during a step, data files cannot be found within the current step
+directory, the previous run directories will be searched for these files. If
+`__init_run == -1` this will look for the most recent run and then look further
+backwards in run history (in run 3 it will look first into run 2, then into 1
+then into 0).  If `__init_run >= 0`, the same procedure is performed but it
+starts with the run specified with __init_run. """
 
 # ------------------------------------------------------------------------------
 # User functions
@@ -108,7 +116,7 @@ def get_write_dir(run=None):
 def get_step_dir(step_name=None, run=None):
     """Output directory where all processed data of a specifc step in a specific run is written.
     Is subdirectory of `write_dir`."""
-    step_name = _step_name if step_name is None else step_name
+    step_name = __step_name if step_name is None else step_name
     return get_write_dir(run) + step_name + '/'
 
 # ------------------------------------------------------------------------------
@@ -140,7 +148,7 @@ def _init_run(next_step_name, run=-1, descr='', init_run=-1):
                 run += 1 # increase run level by one
         else:
             run = 0
-            descr = 'first_run' if descr == '' else descr
+            descr = 'run0' if descr == '' else descr
     # case run > -1: simply update avail_runs
     else:
         avail_runs = json.load(open(runs_filename), object_pairs_hook=OrderedDict)
@@ -160,27 +168,31 @@ def _init_run(next_step_name, run=-1, descr='', init_run=-1):
     # logger for the whole pipeline, to be invoked by `pipe.log.info(msg)`, for example
     _init_log()
 
-def _run_step(step_name, params):
-    step_key = [k for (k, v) in avail_steps.items() if v == step_name][0]
-    info = 'run ' + str(__run) + ' (' + avail_runs[str(__run)][1] + ')' + ' / ' + step_key + ' (' + step_name + ')' \
-           + (' with init ' + str(__init_run) if __init_run > -1 else '')
-    log_pipe.info(info)
-    # output params dict for visual check
-    print(len(info) * '_' + '\n' + info)
-    for key, value in params.items():
-        print('    {} = {}'.format(key, value))
+def _init_step(step_name, mode='w'):
+    global __step_name
+    __step_name = step_name
     # create step directories, log files etc.
-    global _step_name
-    _step_name = step_name
     step_dir = get_step_dir()
     # data directory of step
     utils.ensure_dir(step_dir + 'arrays/')
     utils.ensure_dir(step_dir + 'figs/')
     # init step logger
-    _init_log_step(step_name)
-    log.info('start step with ' + ('init ' + str(__init_run)) if __init_run > -1 else 'default init (most recent run)')
+    _init_log_step(step_name, mode=mode)
+
+def _run_step(step_name, params):
+    _init_step(step_name)
+    step_key = [k for (k, v) in avail_steps.items() if v == step_name][0]
+    info = 'run ' + str(__run) + ' (' + avail_runs[str(__run)][1] + ')' + ' / ' + step_key + ' (' + step_name + ')' \
+           + (' with init ' + str(__init_run) if __init_run > -1 else '')
+    log_pipe.info(info)
+    # output params dict for visual check
+    params_info = info
+    for key, value in params.items():
+        params_info += '\n    {} = {}'.format(key, value)
+    log.info(params_info)
+    log.info('start step with ' + ('init_run=' + str(__init_run)) if __init_run > -1 else 'default init_run (most recent run)')
     # saving params dict
-    json.dump(params, open(step_dir + 'params.json', 'w'), indent=4, indent_to_level=0)
+    json.dump(params, open(get_step_dir() + 'params.json', 'w'), indent=4, indent_to_level=0)
     # import step module
     step = import_module('.steps.' + step_name, 'dsb3')
     try:
@@ -192,9 +204,23 @@ def _run_step(step_name, params):
             raise e
     if step_dict is not None:
         save_step(step_dict, step_name)
+    # generate an html that compiles all figures written to `step_dir + 'figs/'`
+    if _visualize_step():
+        log.info('... wrote ' +  get_step_dir() + 'figs' + '.html')
     finish_msg = '... finished the step'
     log.info(finish_msg)
     log_pipe.info(finish_msg)
+
+def _visualize_step(step_name=None):
+    if step_name is None:
+        step_name = __step_name
+    else:
+        _init_step(step_name, mode='a')
+    figs_dir = get_step_dir() + 'figs/'
+    if os.path.exists(figs_dir) and not utils.dir_is_empty(figs_dir):
+        vis.write_figs_overview_html(figs_dir)
+        return True
+    return False
 
 def _init_patients():
     from collections import OrderedDict
@@ -225,7 +251,7 @@ def _init_patients():
         patients_raw_data_paths = OrderedDict(list(patients_raw_data_paths.items())[:n_patients])
     else:
         n_patients = len(patients)
-    print('processing', n_patients, 'patient', 's' if n_patients > 1 else '')
+    print('processing', n_patients, 'patient' + ('s' if n_patients > 1 else ''))
 
 def _init_log(level=logging.INFO):
     global log_pipe
@@ -237,13 +263,13 @@ def _init_log(level=logging.INFO):
     log_pipe = _add_file_handle_to_log(log_pipe, filename, 'a', level)
     log_pipe.propagate = False
 
-def _init_log_step(step_name, level=logging.INFO):
+def _init_log_step(step_name, level=logging.INFO, mode='w'):
     global log_step, log
     step_dir = get_step_dir(step_name)
     filename = step_dir + 'log.txt'
     log_step = logging.getLogger(filename)
     log_step.setLevel(level) # it's necessary to set the level also here
-    log_step = _add_file_handle_to_log(log_step, filename, 'w', level, passed_time=True)
+    log_step = _add_file_handle_to_log(log_step, filename, mode, level, passed_time=True)
     # write errors also to pipeline log file
     filename = get_write_dir()+ 'log.txt'
     log_step = _add_file_handle_to_log(log_step, filename, 'a', logging.WARNING)
@@ -256,7 +282,7 @@ def _init_log_step(step_name, level=logging.INFO):
     # tensorflow log file
     global log_tf
     log_tf = step_dir + 'log_tf.txt'
-    open(log_tf, 'w').close()
+    open(log_tf, mode).close()
 
 class LogFormatter(logging.Formatter):
     msg  = '%(msg)s'

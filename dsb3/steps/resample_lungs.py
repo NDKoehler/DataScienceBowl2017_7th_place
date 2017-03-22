@@ -5,6 +5,7 @@ import SimpleITK as sitk
 import scipy.ndimage
 import dicom
 import json
+import math
 from joblib import Parallel, delayed
 from tqdm import tqdm
 from collections import OrderedDict
@@ -48,10 +49,9 @@ def run(target_spacing_zyx,
         raise ValueError('Invalid data_type. Use int16 or float32.')
     if not os.path.exists(checkpoint_dir):
         raise ValueError('checkpoint_dir ' + checkpoint_dir + ' does not exist.')
-    # heterogenous spacing -> homogeneous spacing
-    pipe.log.info('resizing and interpolating scans')
+    pipe.log.info('resizing and interpolating scans') # heterogenous spacing -> homogeneous spacing
     patients_dict = dict(Parallel(n_jobs=min(pipe.n_CPUs, len(pipe.patients)), verbose=100)(
-                                  delayed(resample_scan)(patient, target_spacing_zyx, data_type)
+                                  delayed(process_patient)(patient, target_spacing_zyx, data_type)
                                   for patient in pipe.patients))
     pipe.log.info('segmenting lung wings and cropping the scan')
     for patient, pa_dict in tqdm(patients_dict.items()):
@@ -70,8 +70,7 @@ def run(target_spacing_zyx,
         # calculate rescaling factor for whole scan
         inverse_scale_yx = [1.0/s for s in scale_yx] # y, x
         # define crop_coords_seg_yx
-        pa_dict['crop_coords_z-list_yx_px'] = []
-        pa_dict['crop_shapes_z-list_yx_px'] = []
+        crop_coords_z_list_yx_px = []
         # lung_wings segmentation
         sess, pred_ops, data = tf_tools.load_network(checkpoint_dir)
         n_batches = int(np.ceil(img_array_zyx.shape[0] / batch_size))
@@ -88,11 +87,9 @@ def run(target_spacing_zyx,
                 layer_cnt = layer_in_batch_cnt + batch_size * batch_cnt
                 crop_coords_yx = get_crop_idx_yx(prediction[layer_in_batch_cnt, :, :, :], crop_coords_seg_yx, inverse_scale_yx)
                 if crop_coords_yx:
-                    crop_shape_yx = int(crop_coords_yx[1] - crop_coords_yx[0]), int(crop_coords_yx[3] - crop_coords_yx[2])
-                    pa_dict['crop_shapes_z-list_yx_px'] += [crop_shape_yx]
-                    pa_dict['crop_coords_z-list_yx_px'] += [crop_coords_yx]
+                    crop_coords_z_list_yx_px += [crop_coords_yx]
         # crop bounding_cube around lung wings and save
-        layers_coords = [[yx_coords[x] for yx_coords in pa_dict['crop_coords_z-list_yx_px']] for x in range(4)]
+        layers_coords = [[yx_coords[x] for yx_coords in crop_coords_z_list_yx_px] for x in range(4)]
         if [True, True, True, True] == [True if len(x) > 0 else False for x in layers_coords]:
             bound_box_coords_yx_px = [max(0, min(layers_coords[0]) - bounding_box_buffer_yx_px[0]),
                                       min(img_array_zyx.shape[0], max(layers_coords[1]) + bounding_box_buffer_yx_px[0]),
@@ -102,8 +99,8 @@ def run(target_spacing_zyx,
             pipe.log.warning('No lung wings found in scan of patient ' + patient + '. Taking the whole scan.')
             bound_box_coords_yx_px = [0, img_array_zyx.shape[0], 0, img_array_zyx.shape[1]]
         pa_dict['bound_box_coords_yx_px'] = bound_box_coords_yx_px
-        pa_dict['basename'] = patient + '_img.npy'
-        pa_dict['pathname'] = pipe.save_array(pa_dict['basename'],
+        pa_dict['basename'] = basename = patient + '_img.npy'
+        pa_dict['pathname'] = pipe.save_array(basename,
                                               img_array_zyx[:,
                                                             bound_box_coords_yx_px[0]:bound_box_coords_yx_px[1],
                                                             bound_box_coords_yx_px[2]:bound_box_coords_yx_px[3]])
@@ -113,6 +110,24 @@ def run(target_spacing_zyx,
     out_dict = OrderedDict([('HU_tissue_range', HU_tissue_range)])
     out_dict.update(patients_dict)
     return out_dict
+
+def process_patient(patient, target_spacing_zyx, data_type):
+    if pipe.dataset_name == 'LUNA16':
+        img_array_zyx, old_spacing_zyx, origin_zyx, acquisition_exception = get_img_array_mhd(pipe.patients_raw_data_paths[patient])
+    elif pipe.dataset_name == 'dsb3':
+        img_array_zyx, old_spacing_zyx, origin_zyx, acquisition_exception = get_img_array_dcom(pipe.patients_raw_data_paths[patient])
+    new_shape_zyx = np.round(img_array_zyx.shape * np.array(old_spacing_zyx) / np.array(target_spacing_zyx))
+    resize_factor = new_shape_zyx / img_array_zyx.shape
+    new_spacing_zyx = list(np.array(old_spacing_zyx) / np.array(resize_factor))
+    old_shape_zyx_px = img_array_zyx.shape
+    img_array_zyx = scipy.ndimage.interpolation.zoom(img_array_zyx if data_type=='int16' else img_array.astype(np.float32), resize_factor, order=3, mode='nearest')
+    return patient, OrderedDict([('img_array_zyx', img_array_zyx),
+                                 ('resampled_scan_spacing_zyx_mm', new_spacing_zyx),
+                                 ('resampled_scan_shape_zyx_px', img_array_zyx.shape),
+                                 ('raw_scan_spacing_zyx_mm', old_spacing_zyx),
+                                 ('raw_scan_shape_zyx_px', old_shape_zyx_px),
+                                 ('raw_scan_origin_zyx_mm', origin_zyx),
+                                 ('acquisition_exception', acquisition_exception)])
 
 def get_pre_normed_value_hist(img_array):
     hist,ran = np.histogram(img_array.flatten(), bins=16*5,normed=True, range=[-1000,600])
@@ -184,27 +199,9 @@ def get_img_array_dcom(img_file):
         return np.array(image, dtype=np.int16)
     scan, acquisition_exception = load_scan(img_file)
     img_array_zyx = get_pixels_hu(scan) # z, y, x
-    spacing_zyx = np.array(list(map(float, ([scan[0].SliceThickness] + scan[0].PixelSpacing)))) # z, y, x
+    spacing_zyx = list(map(float, ([scan[0].SliceThickness] + scan[0].PixelSpacing))) # z, y, x
     origin_zyx = None
     return img_array_zyx, spacing_zyx, origin_zyx, acquisition_exception
-
-def resample_scan(patient, target_spacing_zyx, data_type):
-    if pipe.dataset_name == 'LUNA16':
-        img_array_zyx, old_spacing_zyx, origin_zyx, acquisition_exception = get_img_array_mhd(pipe.patients_raw_data_paths[patient])
-    elif pipe.dataset_name == 'dsb3':
-        img_array_zyx, old_spacing_zyx, origin_zyx, acquisition_exception = get_img_array_dcom(pipe.patients_raw_data_paths[patient])
-    new_shape_zyx = np.round(img_array_zyx.shape * np.array(old_spacing_zyx) / np.array(target_spacing_zyx))
-    resize_factor = new_shape_zyx / img_array_zyx.shape
-    new_spacing_zyx = list(np.array(old_spacing_zyx) / np.array(resize_factor))
-    old_shape_zyx_px = img_array_zyx.shape
-    img_array_zyx = scipy.ndimage.interpolation.zoom(img_array_zyx if data_type=='int16' else img_array.astype(np.float32), resize_factor, order=1, mode='nearest')
-    return patient, OrderedDict([('img_array_zyx', img_array_zyx),
-                                 ('resampled_scan_spacing_zyx_mm', new_spacing_zyx),
-                                 ('resampled_scan_shape_zyx_px', img_array_zyx.shape),
-                                 ('raw_scan_spacing_zyx_mm', old_spacing_zyx),
-                                 ('raw_scan_shape_zyx_px', old_shape_zyx_px),
-                                 ('raw_scan_origin_zyx_mm', origin_zyx),
-                                 ('acquisition_exception', acquisition_exception)])
 
 def clip_HU_range(img_array, HU_tissue_range):
     if img_array.dtype == np.int16:

@@ -5,19 +5,19 @@ from collections import OrderedDict
 # ------------------------------------------------------------------------------
 
 pipe = OrderedDict([
-    ('n_patients', 1), # number of patients to process, 0 means all
+    ('n_patients', 0), # number of patients to process, 0 means all
 # dataset origin and paths
     ('dataset_name', 'LUNA16'), # 'LUNA16' or 'dsb3'
     ('raw_data_dirs', {
         'LUNA16': '/home/alex_wolf/storage/dsb3/data_raw/LUNA16/',
         'dsb3': '/home/alex_wolf/storage/dsb3/data_raw/dsb3/stage1/',
     }),
-    ('write_basedir', '/home/alex_wolf/test/'),
+    ('write_basedir', '/home/alex_wolf/storage/dsb3/alex_170322/'),
 # data splits
     ('random_seed', 17),
     ('tr_va_ho_split', [0.2, 0.8, 0]), # something like 0.15, 0.7, 0.15
 # technical parameters
-    ('n_CPUs', 7),
+    ('n_CPUs', 5),
     ('GPU_ids', [0]),
     ('GPU_memory_fraction', 0.85),
 ])
@@ -85,13 +85,13 @@ gen_submission = OrderedDict([
 # ------------------------------------------------------------------------------
 
 gen_nodule_masks = OrderedDict([
+    ('ellipse_mode', True),
     ('reduced_mask_radius_fraction', 0.5),
     ('mask2pred_lower_radius_limit_px', 3),
     ('mask2pred_upper_radius_limit_px', 15),
     ('LUNA16_annotations_csv_path', '../dsb3a_assets/LIDC-annotations_2_nodule-seg_annotations/annotations_min+missing_LUNA16_patients.csv'),
-    ('num_minimal_affected_layers', 5),
     ('yx_buffer_px', 1),
-    ('z_buffer_px', 2),
+    ('z_buffer_px', 0),
 ])
 
 gen_nodule_seg = OrderedDict([

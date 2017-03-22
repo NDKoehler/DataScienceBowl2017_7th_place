@@ -70,8 +70,8 @@ def run(target_spacing_zyx,
         # calculate rescaling factor for whole scan
         inverse_scale_yx = [1.0/s for s in scale_yx] # y, x
         # define crop_coords_seg_yx
-        pa_dict['crop_coords_zyx_px'] = []
-        pa_dict['crop_shapes_zyx_px'] = []
+        pa_dict['crop_coords_z-list_yx_px'] = []
+        pa_dict['crop_shapes_z-list_yx_px'] = []
         # lung_wings segmentation
         sess, pred_ops, data = tf_tools.load_network(checkpoint_dir)
         n_batches = int(np.ceil(img_array_zyx.shape[0] / batch_size))
@@ -86,25 +86,27 @@ def run(target_spacing_zyx,
             # evaluate prediction -> get crop idx
             for layer_in_batch_cnt in range(z_crop_idx[1] - z_crop_idx[0]):
                 layer_cnt = layer_in_batch_cnt + batch_size * batch_cnt
-                crop_coords = get_crop_idx(prediction[layer_in_batch_cnt, :, :, :], crop_coords_seg_yx, inverse_scale_yx)
-                if crop_coords:
-                    crop_shape = (int(crop_coords[1] - crop_coords[0]), int(crop_coords[3] - crop_coords[2]), 1)
-                    pa_dict['crop_shapes_zyx_px'] += [crop_shape]
-                    pa_dict['crop_coords_zyx_px'] += [crop_coords]
+                crop_coords_yx = get_crop_idx_yx(prediction[layer_in_batch_cnt, :, :, :], crop_coords_seg_yx, inverse_scale_yx)
+                if crop_coords_yx:
+                    crop_shape_yx = int(crop_coords_yx[1] - crop_coords_yx[0]), int(crop_coords_yx[3] - crop_coords_yx[2])
+                    pa_dict['crop_shapes_z-list_yx_px'] += [crop_shape_yx]
+                    pa_dict['crop_coords_z-list_yx_px'] += [crop_coords_yx]
         # crop bounding_cube around lung wings and save
-        layers_coords = [[coords[x] for coords in pa_dict['crop_coords_zyx_px']] for x in range(4)]
+        layers_coords = [[yx_coords[x] for yx_coords in pa_dict['crop_coords_z-list_yx_px']] for x in range(4)]
         if [True, True, True, True] == [True if len(x) > 0 else False for x in layers_coords]:
-            lung_coords = [max(0, min(layers_coords[0]) - bounding_box_buffer_yx_px[0]),
-                           min(img_array_zyx.shape[0], max(layers_coords[1]) + bounding_box_buffer_yx_px[0]),
-                           max(0, min(layers_coords[2]) - bounding_box_buffer_yx_px[1]),
-                           min(img_array_zyx.shape[1], max(layers_coords[3]) + bounding_box_buffer_yx_px[1])]
+            bound_box_coords_yx_px = [max(0, min(layers_coords[0]) - bounding_box_buffer_yx_px[0]),
+                                      min(img_array_zyx.shape[0], max(layers_coords[1]) + bounding_box_buffer_yx_px[0]),
+                                      max(0, min(layers_coords[2]) - bounding_box_buffer_yx_px[1]),
+                                      min(img_array_zyx.shape[1], max(layers_coords[3]) + bounding_box_buffer_yx_px[1])]
         else:
-            pipe.log.warning('No lung wings found in scan of patient  {}'.format(patient) + '. Taking the whole scan.')
-            lung_coords = [0, img_array_zyx.shape[0], 0, img_array_zyx.shape[1]]
-        pa_dict['bounding_box_coords_yx_px'] = lung_coords
+            pipe.log.warning('No lung wings found in scan of patient ' + patient + '. Taking the whole scan.')
+            bound_box_coords_yx_px = [0, img_array_zyx.shape[0], 0, img_array_zyx.shape[1]]
+        pa_dict['bound_box_coords_yx_px'] = bound_box_coords_yx_px
         pa_dict['basename'] = patient + '_img.npy'
-        pathname = pipe.save_array(pa_dict['basename'], img_array_zyx[:, lung_coords[0]:lung_coords[1], lung_coords[2]:lung_coords[3]])
-        pa_dict['pathname'] = pathname
+        pa_dict['pathname'] = pipe.save_array(pa_dict['basename'],
+                                              img_array_zyx[:,
+                                                            bound_box_coords_yx_px[0]:bound_box_coords_yx_px[1],
+                                                            bound_box_coords_yx_px[2]:bound_box_coords_yx_px[3]])
         patients_dict[patient] = pa_dict
     sess.close()
     # compile results in dictionary
@@ -196,13 +198,13 @@ def resample_scan(patient, target_spacing_zyx, data_type):
     new_spacing_zyx = list(np.array(old_spacing_zyx) / np.array(resize_factor))
     old_shape_zyx_px = img_array_zyx.shape
     img_array_zyx = scipy.ndimage.interpolation.zoom(img_array_zyx if data_type=='int16' else img_array.astype(np.float32), resize_factor, order=1, mode='nearest')
-    return patient, {'img_array_zyx': img_array_zyx,
-                     'resampled_scan_spacing_zyx_mm': new_spacing_zyx,
-                     'resampled_scan_shape_zyx_px': img_array_zyx.shape,
-                     'raw_scan_spacing_zyx_mm': old_spacing_zyx,
-                     'raw_scan_shape_zyx_px': old_shape_zyx_px,
-                     'raw_scan_origin_zyx_mm': origin_zyx,
-                     'acquisition_exception': acquisition_exception}
+    return patient, OrderedDict([('img_array_zyx', img_array_zyx),
+                                 ('resampled_scan_spacing_zyx_mm', new_spacing_zyx),
+                                 ('resampled_scan_shape_zyx_px', img_array_zyx.shape),
+                                 ('raw_scan_spacing_zyx_mm', old_spacing_zyx),
+                                 ('raw_scan_shape_zyx_px', old_shape_zyx_px),
+                                 ('raw_scan_origin_zyx_mm', origin_zyx),
+                                 ('acquisition_exception', acquisition_exception)])
 
 def clip_HU_range(img_array, HU_tissue_range):
     if img_array.dtype == np.int16:
@@ -229,7 +231,7 @@ def zero_center(img_array):
     img_array = img_array - pixel_mean
     return img_array
 
-def get_crop_idx(pred, crop_coords, invers_scale_yx):
+def get_crop_idx_yx(pred, crop_coords, invers_scale_yx):
     _, thresh_pred = cv2.threshold(pred.copy(), 128, 255, cv2.THRESH_BINARY)
     thresh_pred = thresh_pred.astype(np.uint8)
     _, contours, _ = cv2.findContours(thresh_pred.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)

@@ -90,24 +90,6 @@ starts with the run specified with __init_run. """
 # User functions
 # ------------------------------------------------------------------------------
 
-def save_step(d, step_name=None):
-    step_dir_ = step_dir if step_name is None else get_step_dir(step_name)
-    json.dump(d, open(step_dir_ + 'out.json', 'w'), indent=4, indent_to_level=1)
-    print('wrote', step_dir_ + 'out.json')
-
-def load_step(step_name=None):
-    step_dir = _get_step_dir_for_load(step_name)
-    return json.load(open(step_dir + 'out.json'))
-
-def save_array(basename, array, step_name=None):
-    step_dir = get_step_dir(step_name) + 'arrays/'
-    np.save(step_dir + basename, array)
-    return step_dir + basename
-
-def load_array(basename, step_name=None):
-    step_dir = _get_step_dir_for_load(step_name) + 'arrays/'
-    return np.load(step_dir + basename)
-
 def get_write_dir(run=None):
     """Output directory where all processed data of a run is written."""
     run = __run if run is None else run
@@ -118,6 +100,30 @@ def get_step_dir(step_name=None, run=None):
     Is subdirectory of `write_dir`."""
     step_name = __step_name if step_name is None else step_name
     return get_write_dir(run) + step_name + '/'
+
+def save_json(d, step_name=None, mode='a'):
+    if mode == 'a':
+        old_d = load_json(step_name)
+        old_d.update(d)
+        d = old_d
+    step_dir = get_step_dir(step_name)
+    with open(step_dir + 'out.json', 'w') as f:
+        json.dump(d, f, indent=4, indent_to_level=1)
+
+def load_json(step_name=None):
+    step_dir = _get_step_dir_for_load(step_name)
+    with open(step_dir + 'out.json') as f:
+        d = json.load(f, object_pairs_hook=OrderedDict)
+    return d
+
+def save_array(basename, array, step_name=None):
+    step_dir = get_step_dir(step_name) + 'arrays/'
+    np.save(step_dir + basename, array)
+    return step_dir + basename
+
+def load_array(basename, step_name=None):
+    step_dir = _get_step_dir_for_load(step_name) + 'arrays/'
+    return np.load(step_dir + basename)
 
 # ------------------------------------------------------------------------------
 # Helper functions
@@ -193,17 +199,17 @@ def _run_step(step_name, params):
     log.info('start step with ' + ('init_run=' + str(__init_run)) if __init_run > -1 else 'default init_run (most recent run)')
     # saving params dict
     json.dump(params, open(get_step_dir() + 'params.json', 'w'), indent=4, indent_to_level=0)
+    # overwrite out json
+    save_json({}, mode='w')
     # import step module
     step = import_module('.steps.' + step_name, 'dsb3')
     try:
-        step_dict = step.run(**params)
+        step.run(**params)
     except TypeError as e:
         if 'run() got an unexpected keyword argument' in str(e):
             raise TypeError(str(e) + '\n Provide one of the valid parameters\n' + step.run.__doc__)
         else:
             raise e
-    if step_dict is not None:
-        save_step(step_dict, step_name)
     # generate an html that compiles all figures written to `step_dir + 'figs/'`
     if _visualize_step():
         log.info('... wrote ' +  get_step_dir() + 'figs' + '.html')

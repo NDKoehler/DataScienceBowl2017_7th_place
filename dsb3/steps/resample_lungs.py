@@ -50,10 +50,12 @@ def run(target_spacing_zyx,
         raise ValueError('Invalid data_type. Use int16 or float32.')
     if not os.path.exists(checkpoint_dir):
         raise ValueError('checkpoint_dir ' + checkpoint_dir + ' does not exist.')
-    out_dict = OrderedDict([('HU_tissue_range', HU_tissue_range)])
+    # init out file with tissue_range info
+    pipe.save_json({'HU_tissue_range': HU_tissue_range})
     n_threads = pipe.n_CPUs
     n_junks = int(np.ceil(pipe.n_patients / n_threads))
     pipe.log.info('processing ' + str(n_junks) + ' junks with ' + str(n_threads) + ' patients each')
+    tf_net = tf_tools.load_network(checkpoint_dir)
     for junk_cnt in range(n_junks):
         patients_junk = []
         for in_junk_cnt in range(n_threads):
@@ -62,12 +64,11 @@ def run(target_spacing_zyx,
                 break
             patients_junk.append(pipe.patients[patient_cnt])
         pipe.log.info('processing junk ' + str(junk_cnt))
-        junk_dict = process_junk(patients_junk, **params)
-        # compile results in dictionary
-        out_dict.update(junk_dict)
-    return out_dict
+        process_junk(patients_junk, tf_net, **params)
+    with tf_tools.redirect_stdout():
+        tf_net[0].close()
 
-def process_junk(patients_junk,
+def process_junk(patients_junk, tf_net,
                  target_spacing_zyx,
                  bounding_box_buffer_yx_px,
                  data_type,
@@ -75,22 +76,23 @@ def process_junk(patients_junk,
                  checkpoint_dir,
                  batch_size,
                  seg_max_shape_yx):
+    sess, pred_ops, data = tf_net
     # pipe.log.info('    resizing and interpolating scans') # heterogenous spacing -> homogeneous spacing
-    patients_dict = dict(Parallel(n_jobs=min(pipe.n_CPUs, len(patients_junk)), verbose=100)(
+    patients_json = dict(Parallel(n_jobs=min(pipe.n_CPUs, len(patients_junk)), verbose=100)(
                                   delayed(process_patient)(patient, target_spacing_zyx, data_type)
                                   for patient in patients_junk))
     # pipe.log.info('    segmenting lung wings and cropping the scan')
     # start tensorflow session
-    for patient, pa_dict in tqdm(patients_dict.items()):
+    for patient, pa_json in tqdm(patients_json.items()):
         config = json.load(open(checkpoint_dir + '/config.json'))
-        img_array_zyx = pa_dict['img_array_zyx']; del pa_dict['img_array_zyx']
+        img_array_zyx = pa_json['img_array_zyx']; del pa_json['img_array_zyx']
         pre_norm_value_hist, value_range = get_pre_normed_value_hist(img_array_zyx)
-        pa_dict['pre_normalized_zero-centered_value_histogram'] = [x for x in pre_norm_value_hist]
-        pa_dict['pre_normalized_zero-centered_value_range'] = [x for x in value_range]
+        pa_json['pre_normalized_zero-centered_value_histogram'] = [x for x in pre_norm_value_hist]
+        pa_json['pre_normalized_zero-centered_value_range'] = [x for x in value_range]
         img_array_zyx = clip_HU_range(img_array_zyx, HU_tissue_range)
         # lung wings segmentation (max width 512 due to embedding_shape of lungwings_segmentation training_data)
-        seg_max_shape_yx = [int(seg_max_shape_yx[0] / pa_dict['resampled_scan_spacing_zyx_mm'][1]), 
-                            int(seg_max_shape_yx[1] / pa_dict['resampled_scan_spacing_zyx_mm'][2])]
+        seg_max_shape_yx = [int(seg_max_shape_yx[0] / pa_json['resampled_scan_spacing_zyx_mm'][1]), 
+                            int(seg_max_shape_yx[1] / pa_json['resampled_scan_spacing_zyx_mm'][2])]
         # value range [-1.0, 1.0] axis [z, y, x, 1]
         scale_yx = [x for x in np.array(config['image_shape'][:2]) / seg_max_shape_yx[:2]] # config['image_shape'] is y, x
         img_array_seg_zyx, crop_coords_seg_yx = seg_preprocessing(img_array_zyx, config, scale_yx, HU_tissue_range)
@@ -99,7 +101,6 @@ def process_junk(patients_junk,
         # define crop_coords_seg_yx
         crop_coords_z_list_yx_px = []
         # lung_wings segmentation
-        sess, pred_ops, data = tf_tools.load_network(checkpoint_dir)
         n_batches = int(np.ceil(img_array_zyx.shape[0] / batch_size))
         for batch_cnt in range(n_batches):
             batch = (-1) * np.ones([batch_size] + config['image_shape'], dtype=np.float32)
@@ -125,16 +126,14 @@ def process_junk(patients_junk,
         else:
             pipe.log.warning('No lung wings found in scan of patient ' + patient + '. Taking the whole scan.')
             bound_box_coords_yx_px = [0, img_array_zyx.shape[0], 0, img_array_zyx.shape[1]]
-        pa_dict['bound_box_coords_yx_px'] = bound_box_coords_yx_px
-        pa_dict['basename'] = basename = patient + '_img.npy'
-        pa_dict['pathname'] = pipe.save_array(basename,
+        pa_json['bound_box_coords_yx_px'] = bound_box_coords_yx_px
+        pa_json['basename'] = basename = patient + '_img.npy'
+        pa_json['pathname'] = pipe.save_array(basename,
                                               img_array_zyx[:,
                                                             bound_box_coords_yx_px[0]:bound_box_coords_yx_px[1],
                                                             bound_box_coords_yx_px[2]:bound_box_coords_yx_px[3]])
-        patients_dict[patient] = pa_dict
-    with tf_tools.redirect_stdout():
-        sess.close()
-    return patients_dict
+        patients_json[patient] = pa_json
+    pipe.save_json(patients_json)
 
 def process_patient(patient, target_spacing_zyx, data_type):
     if pipe.dataset_name == 'LUNA16':

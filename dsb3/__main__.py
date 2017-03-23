@@ -41,8 +41,10 @@ def main():
     aa = parser.add_argument_group('Other').add_argument
     aa('-h', '--help', action='help',
        help='Show this help message and exit.')
-    aa('-n', '--n_patients', type=int, default=0, metavar='n',
-       help='Choose the number of patients to process to test the pipeline (default: process all patients).')
+    aa('-n', '--n_patients', type=int, default=None, metavar='n',
+       help='Choose the number of patients to process to test the pipeline (default: read from params file).')
+    aa('-dg', '--dataset_name_gpu', type=str, default=None, metavar='dg',
+       help='Choose dataset_name and GPU_id, e.g., "dsb3,0" (default: read from params file).')
     args = parser.parse_args()
     if ',' in args.steps:
         step_names = args.steps.split(',')
@@ -63,8 +65,12 @@ def main():
             raise ValueError('Do not know any step called ' + step_name +'.')
     # --------------------------------------------------------------------------
     # overwrite default parameters
-    if args.n_patients > 0:
+    if args.n_patients is not None:
         params.pipe['n_patients'] = args.n_patients
+    if args.dataset_name_gpu is not None:
+        dataset_name, GPU_id = args.dataset_name_gpu.split(',')
+        params.pipe['dataset_name'] = dataset_name
+        params.pipe['GPU_ids'] = [int(GPU_id)]
     # --------------------------------------------------------------------------
     # init pipeline
     init_pipeline(**params.pipe)

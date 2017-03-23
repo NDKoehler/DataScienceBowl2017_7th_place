@@ -18,6 +18,7 @@ def init_pipeline(dataset_name,
     # checks
     if dataset_name not in pipe.avail_dataset_names:
         raise ValueError('dataset_name needs to be one of' + str(avail_dataset_names))
+    print('processing dataset', dataset_name)
     # set a pipeline attributes
     pipe.dataset_name = dataset_name # the dataset identifier
     pipe.raw_data_dir = raw_data_dirs[dataset_name] # the raw data

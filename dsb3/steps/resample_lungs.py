@@ -45,15 +45,42 @@ def run(target_spacing_zyx,
     out_dict : dict
         Result dictionary.
     """
+    params = locals()
     if data_type not in ['float32', 'int16']:
         raise ValueError('Invalid data_type. Use int16 or float32.')
     if not os.path.exists(checkpoint_dir):
         raise ValueError('checkpoint_dir ' + checkpoint_dir + ' does not exist.')
-    pipe.log.info('resizing and interpolating scans') # heterogenous spacing -> homogeneous spacing
-    patients_dict = dict(Parallel(n_jobs=min(pipe.n_CPUs, len(pipe.patients)), verbose=100)(
+    out_dict = OrderedDict([('HU_tissue_range', HU_tissue_range)])
+    n_threads = pipe.n_CPUs
+    n_junks = int(np.ceil(pipe.n_patients / n_threads))
+    pipe.log.info('processing ' + str(n_junks) + ' junks with ' + str(n_threads) + ' patients each')
+    for junk_cnt in range(n_junks):
+        patients_junk = []
+        for in_junk_cnt in range(n_threads):
+            patient_cnt = n_threads * junk_cnt + in_junk_cnt
+            if patient_cnt >= pipe.n_patients:
+                break
+            patients_junk.append(pipe.patients[patient_cnt])
+        pipe.log.info('processing junk ' + str(junk_cnt))
+        junk_dict = process_junk(patients_junk, **params)
+        # compile results in dictionary
+        out_dict.update(junk_dict)
+    return out_dict
+
+def process_junk(patients_junk,
+                 target_spacing_zyx,
+                 bounding_box_buffer_yx_px,
+                 data_type,
+                 HU_tissue_range,
+                 checkpoint_dir,
+                 batch_size,
+                 seg_max_shape_yx):
+    # pipe.log.info('    resizing and interpolating scans') # heterogenous spacing -> homogeneous spacing
+    patients_dict = dict(Parallel(n_jobs=min(pipe.n_CPUs, len(patients_junk)), verbose=100)(
                                   delayed(process_patient)(patient, target_spacing_zyx, data_type)
-                                  for patient in pipe.patients))
-    pipe.log.info('segmenting lung wings and cropping the scan')
+                                  for patient in patients_junk))
+    # pipe.log.info('    segmenting lung wings and cropping the scan')
+    # start tensorflow session
     for patient, pa_dict in tqdm(patients_dict.items()):
         config = json.load(open(checkpoint_dir + '/config.json'))
         img_array_zyx = pa_dict['img_array_zyx']; del pa_dict['img_array_zyx']
@@ -105,11 +132,9 @@ def run(target_spacing_zyx,
                                                             bound_box_coords_yx_px[0]:bound_box_coords_yx_px[1],
                                                             bound_box_coords_yx_px[2]:bound_box_coords_yx_px[3]])
         patients_dict[patient] = pa_dict
-    sess.close()
-    # compile results in dictionary
-    out_dict = OrderedDict([('HU_tissue_range', HU_tissue_range)])
-    out_dict.update(patients_dict)
-    return out_dict
+    with tf_tools.redirect_stdout():
+        sess.close()
+    return patients_dict
 
 def process_patient(patient, target_spacing_zyx, data_type):
     if pipe.dataset_name == 'LUNA16':

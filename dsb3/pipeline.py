@@ -119,7 +119,7 @@ def get_step_dir(step_name=None, run=None):
 
 def save_json(basename, d, step_name=None, mode='w'):
     if mode == 'a':
-        if os.path.exists('out.json' if basename is None else basename):
+        if os.path.exists(get_step_dir(step_name) + 'out.json' if basename is None else basename):
             old_d = load_json(step_name)
             old_d.update(d)
             d = old_d
@@ -289,9 +289,9 @@ def _init_patients_by_label():
                 for label in [1, 0]:
                     patients_by_label[label] = [patient for patient in patients if nodule_masks_json[patient]['nodule_patient'] == bool(label)]
                 json.dump(patients_by_label, open(filename, 'w'), indent=4)
-            except FileNotFoundError:
-                print('Could not create splits and patients with labels list. Run step "gen_nodule_masks" first.')
-                log_pipe.warning('Could not create splits and patients with labels list. Run step "gen_nodule_masks" first.')
+            except (FileNotFoundError, KeyError):
+                print('Could not create splits and patients with labels list. Run enough patients in "gen_nodule_masks" first.')
+                log_pipe.warning('Could not create splits and patients with labels list. Run enough patients in "gen_nodule_masks" first.')
                 return False
         elif dataset_name == 'dsb3':
             import pandas as pd

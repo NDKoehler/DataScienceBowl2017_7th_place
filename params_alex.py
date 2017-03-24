@@ -12,7 +12,7 @@ pipe = OrderedDict([
         'LUNA16': '/home/alex_wolf/storage/dsb3/data_raw/LUNA16/',
         'dsb3': '/home/alex_wolf/storage/dsb3/data_raw/dsb3/stage1/',
     }),
-    ('write_basedir', '/home/alex_wolf/storage/dsb3/alex_170323_test/'),
+    ('write_basedir', '/home/alex_wolf/storage/dsb3/alex_170323/'),
 # data splits
     ('random_seed', 17),
     ('tr_va_ho_split', [0.2, 0.8, 0]), # something like 0.15, 0.7, 0.15

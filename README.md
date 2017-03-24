@@ -10,33 +10,33 @@ for getting help.
 
 Let us start a first `run` of the pipeline and restrict ourselves to step 0 and 1 with
 ```
-$ ./dsb3.py step0,step1
+$ ./dsb3.py 0,step1
 ```
 which produces the following output
 ```
 $ cat ~/test/LUNA16_0/log.txt
-2017-03-22 01:49 | 00:00:00 - run 0 / step0 (resample_lungs)
+2017-03-22 01:49 | 00:00:00 - run 0 / 0 (resample_lungs)
 2017-03-22 01:49 | 00:00:11 - finished step
-2017-03-22 01:49 | 00:00:00 - run 0 / step1 (gen_prob_maps)
+2017-03-22 01:49 | 00:00:00 - run 0 / 1 (gen_prob_maps)
 2017-03-22 01:50 | 00:00:27 - finished step
 ```
-Now we want to change a parameter for step1, but do not want to recompute step0, so we do
+Now we want to change a parameter for 1, but do not want to recompute 0, so we do
 ```
-$ ./dsb3.py step1 --descr "now using 3 view angles"
+$ ./dsb3.py 1 --descr "now using 3 view angles"
 ```
 which produces
 ```
 $ cat ~/test/LUNA16_1/log.txt
-2017-03-22 01:55 | 00:00:00 - run 1 / step1 (gen_prob_maps) with init 0
+2017-03-22 01:55 | 00:00:00 - run 1 / 1 (gen_prob_maps) with init 0
 2017-03-22 01:55 | 00:00:16 - finished step
 ```
 By providing a description, we automatically started a `run` 1 that retrieves
-the data for `step0` from `run` 0 but keeps on producing new data in the higher
+the data for `0` from `run` 0 but keeps on producing new data in the higher
 steps. Now `./dsb3.py -h` shows
 ````
 ...
 Choices for "--run" and "--init_run":
-  0   2017-03-22 01:49 : default
+  0   2017-03-22 01:49 : first run
   1   2017-03-22 01:55 : now using 3 view_angles
 ```
 This is the underlying directory structure.
@@ -73,19 +73,19 @@ small things (like stopping tensorflow from outputting loads and loads of
 useless variables. Comes tomorrow and will work in this direction visualize the
 result of a computation using
 ```
-./dsb3.py step0 -a vis
+./dsb3.py 0 -a vis
 ```
 Run and visualize a sequence of steps
 ```
-./dsb3.py step0,step1,step2 -a all
+./dsb3.py 0,1,2 -a all
 ```
 
 ### 
 
 ### Features
 * manage pipeline optimization via `pipeline runs`
-* easy to use mit top-level command, z.b. `dsb3 step0` oder `dsb3 resample_lungs` 
-  fuehrt “step0" aus, `dsb3 step0 —action evaluate` evaluiert den schritt usw.
+* easy to use mit top-level command, z.b. `dsb3 0` oder `dsb3 resample_lungs` 
+  fuehrt “0" aus, `dsb3 0 —action evaluate` evaluiert den schritt usw.
 * trennung pipeline und steps, pipeline modul regelt alles uebergeordnete, step
   module sind untergeordnet und muessen bestimmte constraints erfuellen, dadurch
   werden unter anderem parameter automatisch gecheckt, directories und output

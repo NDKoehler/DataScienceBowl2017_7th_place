@@ -17,7 +17,7 @@ def init_pipeline(dataset_name,
     from . import pipeline as pipe
     # checks
     if dataset_name not in pipe.avail_dataset_names:
-        raise ValueError('dataset_name needs to be one of' + str(avail_dataset_names))
+        raise ValueError('dataset_name needs to be one of' + str(pipe.avail_dataset_names))
     print('processing dataset', dataset_name)
     # set a pipeline attributes
     pipe.dataset_name = dataset_name # the dataset identifier
@@ -27,13 +27,18 @@ def init_pipeline(dataset_name,
         os.makedirs(write_basedir)
     pipe.write_basedir = write_basedir.rstrip('/') + '/'
     pipe.n_patients = n_patients
+    # logger for the whole pipeline, to be invoked by `pipe.log.info(msg)`, for example
+    pipe._init_log()
     # locate input data files and init patient lists
     np.random.seed(random_seed)
     pipe._init_patients()
+    pipe._init_patients_by_label()
+    pipe._init_patients_by_split(tr_va_ho_split)
     # technical parameters
     pipe.n_CPUs = n_CPUs
     pipe.GPU_memory_fraction = GPU_memory_fraction
     pipe.GPU_ids = GPU_ids
+    print('with GPUs_ids', GPU_ids)
     # --------------------------------------------------------------------------
     # environment variables
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = '100' # disable tensorflow info and warning logs

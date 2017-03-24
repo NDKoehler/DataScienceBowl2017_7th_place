@@ -4,7 +4,9 @@ from collections import OrderedDict
 
 def write_figs_overview_html(figs_directory, show_image_info=True):
     sorted_filenames_dict = get_filenames_sorted_by_the_last_element_of_basename(figs_directory)
-    n_rows = max([len(val) for val in sorted_filenames_dict.values()])
+    n_rows_per_column = [len(val) for val in sorted_filenames_dict.values()]
+    print('n_rows_per_column', n_rows_per_column, 'in', figs_directory.rstrip('/') + '.html')
+    n_rows = max(n_rows_per_column)
     with open(figs_directory.rstrip('/') + '.md', 'w') as f:
         write_col_names(f, sorted_filenames_dict.keys())
         for irow in range(n_rows):
@@ -54,9 +56,9 @@ def get_filenames_sorted_by_the_last_element_of_basename(directory):
     filenames = natsorted(os.listdir(directory))
     sorted_filenames_dict = OrderedDict([])
     for filename in filenames:
-        label = filename.split('.')[0].split('_')[-1]
-        if label in sorted_filenames_dict:
-            sorted_filenames_dict[label].append(filename)
+        suffix = filename.split('.')[0].split('_')[-1]
+        if suffix in sorted_filenames_dict:
+            sorted_filenames_dict[suffix].append(filename)
         else:
-            sorted_filenames_dict[label] = [filename]
+            sorted_filenames_dict[suffix] = [filename]
     return sorted_filenames_dict

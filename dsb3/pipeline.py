@@ -18,10 +18,13 @@ from . import hrjson as json
 avail_dataset_names = ['LUNA16', 'dsb3']
 
 avail_steps = OrderedDict([
-    ('step0', 'resample_lungs'),
-    ('step1', 'gen_prob_maps'),
-    ('step2', 'gen_candidates'),
-    ('step4', 'gen_nodule_masks'),
+    ('0', 'resample_lungs'),
+    ('1', 'gen_prob_maps'),
+    ('2', 'gen_candidates'),
+    ('2eval', 'gen_candidates_eval'),
+    ('2vis', 'gen_candidates_vis'),
+    ('3', 'interpolate_candidates'),
+    ('4', 'gen_nodule_masks'),
 ])
 
 avail_runs = OrderedDict([])
@@ -39,11 +42,20 @@ n_patients = None
 patients = None
 """List of all patients. Use this to iterate over patients."""
 
+patients_by_split = None
+"""Dict of patients by training / validation / heldout."""
+
+patients_by_label = None
+"""Dict of patients by label."""
+
 raw_data_dir = None
 """Directory with raw data."""
 
 patients_raw_data_path = None
 """Ordered dictionary that stores for each patient id the path to the raw data."""
+
+patients_label = None
+"""Dict of patients storing the label for each patient."""
 
 # logging
 log_pipe = None
@@ -71,7 +83,10 @@ GPU_memory_fraction = 0.85
 
 # track pipeline runs
 __step_name = None
-"""Stores which step is currently processed."""
+"""Name of the step that is currently processed."""
+
+__step = None
+"""Key characterizing the current step ."""
 
 __run = 0
 """Integer that identifies the current run of the pipeline."""
@@ -79,7 +94,7 @@ __run = 0
 __init_run = -1
 """Integer that identifies the run that is used to initialize the current run.
 
-When during a step, data files cannot be found within the current step
+If during a step, data files cannot be found within the current step
 directory, the previous run directories will be searched for these files. If
 `__init_run == -1` this will look for the most recent run and then look further
 backwards in run history (in run 3 it will look first into run 2, then into 1
@@ -101,18 +116,19 @@ def get_step_dir(step_name=None, run=None):
     step_name = __step_name if step_name is None else step_name
     return get_write_dir(run) + step_name + '/'
 
-def save_json(d, step_name=None, mode='a'):
+def save_json(basename, d, step_name=None, mode='w'):
     if mode == 'a':
-        old_d = load_json(step_name)
-        old_d.update(d)
-        d = old_d
+        if os.path.exists('out.json' if basename is None else basename):
+            old_d = load_json(step_name)
+            old_d.update(d)
+            d = old_d
     step_dir = get_step_dir(step_name)
-    with open(step_dir + 'out.json', 'w') as f:
+    with open(step_dir + ('out.json' if basename is None else basename), 'w') as f:
         json.dump(d, f, indent=4, indent_to_level=1)
 
-def load_json(step_name=None):
+def load_json(basename, step_name=None):
     step_dir = _get_step_dir_for_load(step_name)
-    with open(step_dir + 'out.json') as f:
+    with open(step_dir + ('out.json' if basename is None else basename)) as f:
         d = json.load(f, object_pairs_hook=OrderedDict)
     return d
 
@@ -141,7 +157,7 @@ def _get_step_dir_for_load(step_name=None):
     raise FileNotFoundError('Did not find ' + step_dir + ' in runs ' + str(trial_runs) + '.')
 
 def _init_run(next_step_name, run=-1, descr='', init_run=-1):
-    runs_filename = write_basedir + dataset_name + '_runs.json'
+    runs_filename = write_basedir + dataset_name + '_runs.json'    
     # case run == -1 and the step has already been run before
     global avail_runs
     if run == -1:
@@ -154,7 +170,7 @@ def _init_run(next_step_name, run=-1, descr='', init_run=-1):
                 run += 1 # increase run level by one
         else:
             run = 0
-            descr = 'run0' if descr == '' else descr
+            descr = 'run zero' if descr == '' else descr
     # case run > -1: simply update avail_runs
     else:
         avail_runs = json.load(open(runs_filename), object_pairs_hook=OrderedDict)
@@ -171,11 +187,10 @@ def _init_run(next_step_name, run=-1, descr='', init_run=-1):
         __init_run = run - 1
     # create directory if it's not there already
     utils.ensure_dir(get_write_dir())
-    # logger for the whole pipeline, to be invoked by `pipe.log.info(msg)`, for example
-    _init_log()
 
 def _init_step(step_name, mode='w'):
-    global __step_name
+    global __step, __step_name
+    __step = [k for k, v in avail_steps.items() if v == step_name][0] 
     __step_name = step_name
     # create step directories, log files etc.
     step_dir = get_step_dir()
@@ -187,8 +202,8 @@ def _init_step(step_name, mode='w'):
 
 def _run_step(step_name, params):
     _init_step(step_name)
-    step_key = [k for (k, v) in avail_steps.items() if v == step_name][0]
-    info = 'run ' + str(__run) + ' (' + avail_runs[str(__run)][1] + ')' + ' / ' + step_key + ' (' + step_name + ')' \
+    info = 'run ' + str(__run) + ' (' + avail_runs[str(__run)][1] + ')' \
+           + ' / step ' + str(__step) + ' (' + __step_name + ')' \
            + (' with init ' + str(__init_run) if __init_run > -1 else '')
     log_pipe.info(info)
     # output params dict for visual check
@@ -199,8 +214,6 @@ def _run_step(step_name, params):
     log.info('start step with ' + ('init_run=' + str(__init_run)) if __init_run > -1 else 'default init_run (most recent run)')
     # saving params dict
     json.dump(params, open(get_step_dir() + 'params.json', 'w'), indent=4, indent_to_level=0)
-    # overwrite out json
-    save_json({}, mode='w')
     # import step module
     step = import_module('.steps.' + step_name, 'dsb3')
     try:
@@ -257,9 +270,65 @@ def _init_patients():
         patients_raw_data_paths = OrderedDict(list(patients_raw_data_paths.items())[:n_patients])
     else:
         n_patients = len(patients)
-    print('processing', n_patients, 'patient' + ('s' if n_patients > 1 else ''))
+    print('with', n_patients, 'patient' + ('s' if n_patients > 1 else ''))
 
-def _init_log(level=logging.INFO):
+def _init_patients_by_label():
+    global patients_by_label
+    filename = get_write_dir() + 'patients_by_label.json'
+    filename2 = get_write_dir() + 'patients_label.json'
+    if False: #os.path.exists(filename):
+        patients_by_label = json.load(open(filename), object_pairs_hook=OrderedDict)
+        patients_label = json.load(open(filename2), object_pairs_hook=OrderedDict)
+    else:
+        patients_by_label = OrderedDict()
+        patients_label = OrderedDict()
+        if dataset_name == 'LUNA16':
+            try: # get nodule positions
+                nodule_masks_json = load_json('out.json', 'gen_nodule_masks')
+                for label in [1, 0]:
+                    patients_by_label[label] = [patient for patient in patients if nodule_masks_json[patient]['nodule_patient'] == bool(label)]
+                json.dump(patients_by_label, open(filename, 'w'), indent=4)
+            except FileNotFoundError:
+                print('Could not create splits. Run step "gen_nodule_masks" first.')
+                log_pipe.warning('Could not create splits. Run step "gen_nodule_masks" first.')
+        elif dataset_name == 'dsb3':
+            import pandas as pd
+            dsb3_labels = pd.read_csv('/'.join(raw_data_dir.split('/')[:-2]) + '/stage1_labels.csv')
+            for label in [1, 0, -1]:
+                patients_by_label[label] = dsb3_labels['id'].loc[dsb3_labels['cancer'] == label].tolist()
+            for patient in patients:
+                if patient in set(dsb3_labels['id'].values.tolist()):
+                    patients_label[patient]['cancer_label'] = dsb3_labels['cancer'].loc[dsb3_labels['id'] == patient].tolist()[0]
+                else:
+                    patients_label[patient]['cancer_label'] = -1
+            json.dump(patients_by_label, open(filename, 'w'), indent=4)
+            json.dump(patients_label, open(filename2, 'w'), indent=4)
+
+def _init_patients_by_split(tr_va_ho_split, tr_va_ho_split_file=None):
+    if sum(tr_va_ho_split) != 1:
+        raise ValueError('tr_va_ho_split has to sum to one!')
+    global patients_by_split
+    filename = get_write_dir() + 'patients_by_split.json'
+    if False: #os.path.exists(filename):
+        patients_splits = json.load(open(filename), object_pairs_hook=OrderedDict)
+        print('reading split from', filename)
+    else:
+        patients_by_label_split = {}
+        for label in [1, 0]:
+            idx_start = 0
+            for split_cnt, split in enumerate(['tr', 'va', 'ho']):
+                idx_end = idx_start + int(tr_va_ho_split[split_cnt] * len(patients_by_label[label])) + 1
+                patients_by_label_split[str(label) + '_' + split] = patients_by_label[label][idx_start:idx_end]
+                idx_start = idx_end
+        patients_by_split = OrderedDict()
+        for split in ['tr', 'va', 'ho']:
+            patients_by_split[split] = []
+            for label in [1, 0]:
+                patients_by_split[split] += patients_by_label_split[str(label) + '_' + split]
+            patients_by_split[split] = list(np.array(patients_by_split[split])[np.random.permutation(len(patients_by_split[split]))])
+        json.dump(patients_by_split, open(filename, 'w'), indent=4)
+
+def _init_log(level=logging.DEBUG):
     global log_pipe
     filename = get_write_dir()+ 'log.txt'
     if os.path.exists(filename):
@@ -269,7 +338,7 @@ def _init_log(level=logging.INFO):
     log_pipe = _add_file_handle_to_log(log_pipe, filename, 'a', level)
     log_pipe.propagate = False
 
-def _init_log_step(step_name, level=logging.INFO, mode='w'):
+def _init_log_step(step_name, level=logging.DEBUG, mode='w'):
     global log_step, log
     step_dir = get_step_dir(step_name)
     filename = step_dir + 'log.txt'
@@ -291,21 +360,22 @@ def _init_log_step(step_name, level=logging.INFO, mode='w'):
     open(log_tf, mode).close()
 
 class LogFormatter(logging.Formatter):
-    msg  = '%(msg)s'
-    def __init__(self, fmt='%(levelno)s: %(msg)s', datefmt='%Y-%m-%d %H:%M', style='%', passed_time=False):
+    def __init__(self, fmt='%(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M', style='%', passed_time=False):
         super().__init__(fmt, datefmt, style)
         self.passed_time = passed_time
-        self.last_time = time.process_time()
+        self.last_time = time.time()
     def format(self, record):
         format_orig = self._style._fmt
         if record.levelno == logging.INFO:
-            current_time = time.process_time()
+            current_time = time.time()
             passed_time_str = time.strftime('%H:%M:%S', time.gmtime(current_time - self.last_time))
             if self.passed_time:
-                self._style._fmt = passed_time_str + ' - %(msg)s'
+                self._style._fmt = passed_time_str + ' - %(message)s'
             else:
-                self._style._fmt = '%(asctime)s | ' + passed_time_str +  ' - %(msg)s'
-            self.last_time = time.process_time()
+                self._style._fmt = '%(asctime)s | ' + passed_time_str +  ' - %(message)s'
+            self.last_time = time.time()
+        if record.levelno == logging.DEBUG:
+            self._style._fmt = '%(message)s'
         result = logging.Formatter.format(self, record)
         self._style._fmt = format_orig
         return result

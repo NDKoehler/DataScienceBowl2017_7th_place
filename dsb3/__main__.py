@@ -29,22 +29,26 @@ def main():
                                      formatter_class=argparse.RawDescriptionHelpFormatter,
                                      epilog=steps_descr()+runs_descr(), add_help=False)
     aa = parser.add_argument_group('Choose "steps".').add_argument
-    aa('steps', type=str, 
-       help='See the choices below, for example, "step0,step1,step2" or "foo_name".')
+    aa('steps', type=str,
+       help='Step key or name, for example, "0,1,2" or "foo_name,bar_name". See the choices below.')
     aa = parser.add_argument_group('Manage pipeline "runs", i.e., repeated sequences of "steps"').add_argument
     aa('-r', '--run', type=int, default=-1, metavar='i',
-       help='Select a "run" (default: work within current run, only start a new run if "-rd" is provided).')
+       help='Run key (default: work within current run).')
     aa('-d', '--descr', type=str, default='', metavar='d',
        help='Trigger a new run by providing a description for it.')
     aa('--init_run', type=int, default=-1, metavar='i',
-       help='Select a "run" for initialization (default: the previous run).')
+       help='Select the initialization run (default: the previous run).')
     aa = parser.add_argument_group('Other').add_argument
     aa('-h', '--help', action='help',
        help='Show this help message and exit.')
     aa('-n', '--n_patients', type=int, default=None, metavar='n',
        help='Choose the number of patients to process to test the pipeline (default: read from params file).')
-    aa('-dg', '--dataset_name_gpu', type=str, default=None, metavar='dg',
-       help='Choose dataset_name and GPU_id, e.g., "dsb3,0" (default: read from params file).')
+    aa('patient', nargs='?', default=None,
+       help="provide patient id")
+    aa('-ds', '--dataset_name', type=str, default=None, metavar='d',
+       help='Choose dataset_name "dsb3" (default: read from params file).')
+    aa('--gpu', type=str, default=None, metavar='gpu',
+       help='Choose GPU_id, e.g., 0 (default: read from params file).')
     args = parser.parse_args()
     if ',' in args.steps:
         step_names = args.steps.split(',')
@@ -67,25 +71,30 @@ def main():
     # overwrite default parameters
     if args.n_patients is not None:
         params.pipe['n_patients'] = args.n_patients
-    if args.dataset_name_gpu is not None:
-        dataset_name, GPU_id = args.dataset_name_gpu.split(',')
+    if args.dataset_name is not None:
+        dataset_name = args.dataset_name_gpu
         params.pipe['dataset_name'] = dataset_name
+    if args.gpu is not None:
+        GPU_id = args.gpu
         params.pipe['GPU_ids'] = [int(GPU_id)]
     # --------------------------------------------------------------------------
     # init pipeline
     init_pipeline(**params.pipe)
+    # reinit the patient iterator list in pipe
+    if args.patient is not None:
+        pipe.patient = [patient]
     # now we can import `pipeline` from anywhere and use its attributes
     # --> plays the role of a class with only a single instance across the module
     # init the current run of the pipeline
     pipe._init_run(step_names[0], args.run, args.descr)
     for step_name in step_names:
         pipe._run_step(step_name, getattr(params, step_name))
-        # pipe._visualize_step(step_name)
+        #pipe._visualize_step(step_name)
 
 def steps_descr():
     descr = 'Choices for "steps":'
     for key, value in pipe.avail_steps.items():
-        descr += '\n  {:12}'.format(key) + value
+        descr += '\n  {:<6} '.format(key) + value
     return descr
 
 def runs_descr():

@@ -1,17 +1,14 @@
 import os, sys
 import numpy as np
-import SimpleITK as sitk
-from glob import glob
 import pandas as pd
 import cv2
-import scipy.ndimage
 from joblib import Parallel, delayed
 from collections import OrderedDict
 from tqdm import tqdm
-from ..utils.ellipse_helpers import *
 from .. import params # this shouldn't actually be necessary, but avoids global variables and more complicated stuff
 from .. import pipeline as pipe
 from .. import visualize as vis
+from ..utils.ellipse_helpers import *
 
 def run(LUNA16_annotations_csv_path,
         ellipse_mode,
@@ -27,38 +24,46 @@ def run(LUNA16_annotations_csv_path,
     # all patients in list have nodules, not a single patient without nodules.
     nodule_patients_set = set(annotations['seriesuid'].values.tolist()) & set(pipe.patients)
     # process nodule patients
-    resample_lungs_dict = pipe.load_step('resample_lungs')
-    pipe.log.info('parallel processing of nodule patients')
-    patients_dict = dict(Parallel(n_jobs=min(pipe.n_CPUs, len(nodule_patients_set)), verbose=100)(
-                         delayed(process_nodule_patient)(patient, annotations, resample_lungs_dict,
-                                                         ellipse_mode, yx_buffer_px, z_buffer_px, mask2pred_upper_radius_limit_px)
-                         for patient in nodule_patients_set))
+    resample_lungs_json = pipe.load_json('out.json', 'resample_lungs')
+    pipe.log.info('process nodule patients')
+    # nothing memory intensive here, so this works fine
+    if True:
+        patients_json = Parallel(n_jobs=min(pipe.n_CPUs, len(nodule_patients_set)), verbose=100)(
+                             delayed(process_nodule_patient)(patient, annotations, resample_lungs_json,
+                                                             ellipse_mode, yx_buffer_px, z_buffer_px, mask2pred_upper_radius_limit_px)
+                             for patient in nodule_patients_set)
+    else:
+        patients_json = [process_nodule_patient(patient, annotations, resample_lungs_json,
+                                                ellipse_mode, yx_buffer_px, z_buffer_px, mask2pred_upper_radius_limit_px)
+                                                for patient in nodule_patients_set]
+    patients_json = OrderedDict(patients_json)
     # loop over non-nodule patients
     pipe.log.info('loop over non_nodule patients')
     for patient in tqdm(pipe.patients):
         if patient not in nodule_patients_set:
-            patients_dict[patient] = OrderedDict()
-            patients_dict[patient]['nodule_patient'] = False
-            img_array = pipe.load_array(resample_lungs_dict[patient]['basename'], 'resample_lungs')
+            patients_json[patient] = OrderedDict()
+            patients_json[patient]['nodule_patient'] = False
+            patients_json[patient]['nodules'] = [] # empty list
+            img_array = pipe.load_array(resample_lungs_json[patient]['basename'], 'resample_lungs')
             mask_array = np.zeros(list(img_array.shape) + [2], dtype=np.uint8)
-            patients_dict[patient]['basename'] = basename = patient + '_mask.npy'
-            patients_dict[patient]['mask_path'] = pipe.save_array(basename, mask_array)
-    return patients_dict
+            patients_json[patient]['basename'] = basename = patient + '_mask.npy'
+            patients_json[patient]['mask_path'] = pipe.save_array(basename, mask_array)
+    pipe.save_json('out.json', patients_json)
 
-def process_nodule_patient(patient, annotations, resample_lungs_dict, 
+def process_nodule_patient(patient, annotations, resample_lungs_json, 
                            ellipse_mode, yx_buffer_px, z_buffer_px, mask2pred_upper_radius_limit_px): # gen_nodule_masks parameters
     patient_annotation = annotations[annotations['seriesuid'] == patient]
-    patient_dict = {}
-    patient_dict['nodule_patient'] = True
-    patient_dict['number_of_nodules'] = len(set(patient_annotation['nodule_id']))
-    patient_dict['nodules'] = []
-    resample_lungs_dict_patient = resample_lungs_dict[patient]
-    img_array_zyx = pipe.load_array(resample_lungs_dict_patient['basename'], 'resample_lungs')
-    bound_box_offset_yx_px = resample_lungs_dict_patient['bound_box_coords_yx_px']
+    patient_json = OrderedDict()
+    patient_json['nodule_patient'] = True
+    patient_json['number_of_nodules'] = len(set(patient_annotation['nodule_id']))
+    patient_json['nodules'] = []
+    resample_lungs_json_patient = resample_lungs_json[patient]
+    img_array_zyx = pipe.load_array(resample_lungs_json_patient['basename'], 'resample_lungs')
+    bound_box_offset_yx_px = resample_lungs_json_patient['bound_box_coords_yx_px']
     bound_box_offset_zyx_px = [0, bound_box_offset_yx_px[0], bound_box_offset_yx_px[2]] # no offset in z
-    real_spacing_zyx = resample_lungs_dict_patient['resampled_scan_spacing_zyx_mm']
-    raw_spacing_zyx = resample_lungs_dict_patient['raw_scan_spacing_zyx_mm']
-    origin_zyx = resample_lungs_dict_patient['raw_scan_origin_zyx_mm']
+    real_spacing_zyx = resample_lungs_json_patient['resampled_scan_spacing_zyx_mm']
+    raw_spacing_zyx = resample_lungs_json_patient['raw_scan_spacing_zyx_mm']
+    origin_zyx = resample_lungs_json_patient['raw_scan_origin_zyx_mm']
     mask_array_zyx = np.zeros(list(img_array_zyx.shape) + [2], dtype=np.uint8)
     for nodule_id in set(patient_annotation['nodule_id']):
         nodule_annotations = patient_annotation.loc[patient_annotation['nodule_id'] == nodule_id]
@@ -67,40 +72,43 @@ def process_nodule_patient(patient, annotations, resample_lungs_dict,
                              mask_array_zyx, img_array_zyx.copy(),
                              origin_zyx, real_spacing_zyx, bound_box_offset_zyx_px, 
                              ellipse_mode, yx_buffer_px, z_buffer_px, mask2pred_upper_radius_limit_px)
-        mask_array_zyx, v_center_zyx_px, real_center_mm, v_diam_px, old_diameter_mm, zyx_bbox_px, center_box_coords_zyx_px = result
-        zyx_bbox_mm = [(zyx_bbox_px[i] + bound_box_offset_zyx_px[i // 2]) * real_spacing_zyx[i // 2] + origin_zyx[i // 2] for i in range(6)]
-        nodule_dict = OrderedDict()
-        nodule_dict['nodule_id'] = int(nodule_id) # int() float() gets right format for json
-        nodule_dict['nodule_priority'] = int(patient_annotation['nodule_priority'].loc[patient_annotation['nodule_id'] == nodule_id].iloc[0])
-        nodule_dict['number_of_annotations'] = len(patient_annotation['nodule_priority'].loc[patient_annotation['nodule_id'] == nodule_id])
-        nodule_dict['center_zyx_px'] = [int(i) for i in v_center_zyx_px]
-        nodule_dict['center_zyx_mm'] = [float(i) for i in real_center_mm]
-        nodule_dict['max_diameter_zyx_px'] = [int(i) for i in v_diam_px]
-        nodule_dict['max_diameter_zyx_mm'] = list(np.array(v_diam_px, dtype=float) * np.array(real_spacing_zyx, dtype=float))
-        nodule_dict['nodule_box_zmin/zmax_ymin/ymax_xmin/xmax_px'] = [int(i) for i in zyx_bbox_px]
-        nodule_dict['nodule_box_zmin/zmax_ymin/ymax_xmin/xmax_mm'] = [float(i) for i in zyx_bbox_mm]
-        nodule_dict['nodule_center_box_zmin/zmax_px_ymin/ymax_xmin/xmax'] = [float(i) for i in center_box_coords_zyx_px]
-        nodule_dict['old_diameter_px'] = int(old_diameter_mm / np.mean(real_spacing_zyx[:2]))
-        nodule_dict['old_diameter_mm'] = float(old_diameter_mm)
-        patient_dict['nodules'].append(nodule_dict)
-        # Look at the center of the annotation
+        mask_array_zyx, v_center_zyx_px, real_center_mm, v_diam_px, old_diameter_mm, nodule_box_xyz_px, center_box_coords_zyx_px = result
+        if not nodule_box_xyz_px: # if the bounding box is empty
+            pipe.log.warning('Could not draw mask for ' + patient + ' ' + str(nodule_id))
+            continue
+        nodule_box_xyz_mm = [(nodule_box_xyz_px[i] + bound_box_offset_zyx_px[i // 2]) * real_spacing_zyx[i // 2] + origin_zyx[i // 2] for i in range(6)]
+        nodule_json = OrderedDict()
+        nodule_json['nodule_id'] = int(nodule_id) # int() float() gets right format for json
+        nodule_json['nodule_priority'] = int(patient_annotation['nodule_priority'].loc[patient_annotation['nodule_id'] == nodule_id].iloc[0])
+        nodule_json['number_of_annotations'] = len(patient_annotation['nodule_priority'].loc[patient_annotation['nodule_id'] == nodule_id])
+        nodule_json['center_zyx_px'] = [int(i) for i in v_center_zyx_px]
+        nodule_json['center_zyx_mm'] = [float(i) for i in real_center_mm]
+        nodule_json['max_diameter_zyx_px'] = [int(i) for i in v_diam_px]
+        nodule_json['max_diameter_zyx_mm'] = list(np.array(v_diam_px, dtype=float) * np.array(real_spacing_zyx, dtype=float))
+        nodule_json['nodule_box_zmin/zmax_ymin/ymax_xmin/xmax_px'] = [int(i) for i in nodule_box_xyz_px]
+        nodule_json['nodule_box_zmin/zmax_ymin/ymax_xmin/xmax_mm'] = [float(i) for i in nodule_box_xyz_mm]
+        nodule_json['nodule_center_box_zmin/zmax_px_ymin/ymax_xmin/xmax'] = [float(i) for i in center_box_coords_zyx_px]
+        nodule_json['old_diameter_px'] = int(old_diameter_mm / np.mean(real_spacing_zyx[:2]))
+        nodule_json['old_diameter_mm'] = float(old_diameter_mm)
+        patient_json['nodules'].append(nodule_json)
+        # show the center of the annotation
         for crop in [False, True]:
             if crop:
-                cropy = zyx_bbox_px[2], zyx_bbox_px[3]
-                cropx = zyx_bbox_px[4], zyx_bbox_px[5]
+                cropy = nodule_box_xyz_px[2], nodule_box_xyz_px[3] + 1 # convention is that bounding box includes the last point, but does not go beyond it
+                cropx = nodule_box_xyz_px[4], nodule_box_xyz_px[5] + 1
             else:
                 cropy = [0, img_array_zyx.shape[1]]
                 cropx = [0, img_array_zyx.shape[2]]
             plt.imshow(img_array_zyx[v_center_zyx_px[0], cropy[0]:cropy[1], cropx[0]:cropx[1]] + 0.25, cmap='Greys')
-            color = 'r' if nodule_dict['nodule_priority'] >= 3 else 'orange' if nodule_dict['nodule_priority'] == 2 else 'green'
-            level = 255 if nodule_dict['nodule_priority'] >= 3 else 170 if nodule_dict['nodule_priority'] == 2 else 85
+            color = 'r' if nodule_json['nodule_priority'] >= 3 else 'orange' if nodule_json['nodule_priority'] == 2 else 'green'
+            level = 255 if nodule_json['nodule_priority'] >= 3 else 170 if nodule_json['nodule_priority'] == 2 else 85
             plt.contour(mask_array_zyx[v_center_zyx_px[0], cropy[0]:cropy[1], cropx[0]:cropx[1], 0], colors=color, levels=[level-1], linestyles='dashed')
             plt.contour(mask_array_zyx[v_center_zyx_px[0], cropy[0]:cropy[1], cropx[0]:cropx[1], 1], colors=color, levels=[level-1])
             plt.savefig(pipe.get_step_dir() + 'figs/' + patient + '-nodule' + str(nodule_id) + '_crop' + str(int(crop)) + '.jpg')            
             plt.clf()
-    patient_dict['basename'] = basename = patient + '_mask.npy'
-    patient_dict['mask_path'] = pipe.save_array(basename, mask_array_zyx)
-    return patient, patient_dict
+    patient_json['basename'] = basename = patient + '_mask.npy'
+    patient_json['mask_path'] = pipe.save_array(basename, mask_array_zyx)
+    return patient, patient_json
 
 def make_nodule(patient, nodule_annotations,
                 mask_array_zyx, img_array_zyx,
@@ -198,8 +206,6 @@ def make_nodule(patient, nodule_annotations,
         radii_draw_xy = (int(radii_yx[1]), int(radii_yx[0]))
         cv2.ellipse(draw_array, center=center_draw_xy, axes=radii_draw_xy,
                     angle=0, startAngle=0, endAngle=360, color=(nodule_priority_uint8), thickness=thickness)
-        if draw_array.shape[0] > draw_array.shape[1]:
-            draw_array = np.swapaxes(draw_array, 0, 1)
         new_mask_array_zyx_shell[v_layer, :, :] = np.clip(draw_array + new_mask_array_zyx_shell[v_layer, :, :], 0, 255)
 
     if ellipse_mode:
@@ -211,13 +217,7 @@ def make_nodule(patient, nodule_annotations,
 
     # Ensure nodule priority in case of overlap - always take maximum
     mask_array_zyx[:, :, :, 0] = np.maximum(new_mask_array_zyx_shell, mask_array_zyx[:, :, :, 0])
-    mask_array_zyx[:, :, :, 1] = np.maximum(new_mask_array_zyx_center, mask_array_zyx[:, :, :, 1])            
-    if 0: # draw center in center channel
-        randy = np.random.randint(0, 1000)
-        for cnt, z_layer in enumerate(np.arange(v_center_zyx_px[2] - 2, v_center_zyx_px[2] + 2)):
-            cv2.imwrite('test_imgs/' + patient+ '_' + str(randy) + '_center_' + str(cnt)+'.jpg', mask_array_zyx[:,:,z_layer,1])
-            cv2.imwrite('test_imgs/' + patient+ '_' + str(randy) + '_img_' + str(cnt)+'.jpg', (255/1400.*img_array_zyx[z_layer, :, :]).astype(np.uint8))
-            cv2.imwrite('test_imgs/' + patient+ '_' + str(randy) + '_shell_' + str(cnt)+'.jpg', mask_array_zyx[:,:,z_layer,0])
+    mask_array_zyx[:, :, :, 1] = np.maximum(new_mask_array_zyx_center, mask_array_zyx[:, :, :, 1])
     return mask_array_zyx, v_center_zyx_px, center_anno_zyx_mm, v_diam_zyx_px, old_diameter_mm, bbox_px_shell_zyx, bbox_px_center_zyx
 
 def draw_ellipse(mask_array_zyx, color, v_center_px, v_diam_px):
@@ -235,8 +235,6 @@ def draw_ellipse(mask_array_zyx, color, v_center_px, v_diam_px):
                                                          center,
                                                          radii_center,
                                                          rotation, v_center_px, v_diam_px, color)
-    # print(np.unique(new_mask, return_counts=True))
-    # plot__both_scatters(new_points, X)
     return new_mask_shell, bbox_px_shell, new_mask_center, bbox_px_center
 
 def draw_new_ellipsoid(new_mask_shape, center, radii, rotation, v_center_px, v_diam_px, color):
@@ -254,9 +252,12 @@ def draw_new_ellipsoid(new_mask_shape, center, radii, rotation, v_center_px, v_d
 
 def get_bounding_box(array):
     points = np.argwhere(array > 1)
-    bbox = [np.min(points[:, 0]), np.max(points[:, 0]),
-            np.min(points[:, 1]), np.max(points[:, 1]),
-            np.min(points[:, 2]), np.max(points[:, 2])]
+    if len(points) > 0:        
+        bbox = [np.min(points[:, 0]), np.max(points[:, 0]),
+                np.min(points[:, 1]), np.max(points[:, 1]),
+                np.min(points[:, 2]), np.max(points[:, 2])]
+    else:
+        bbox = []
     return bbox
 
 def plot(mask, image):

@@ -13,7 +13,7 @@ from .. import utils
 from .. import tf_tools
 from .. import pipeline as pipe
 
-def run(target_spacing_zyx,
+def run(new_spacing_zyx,
         bounding_box_buffer_yx_px,
         data_type,
         HU_tissue_range,
@@ -25,10 +25,10 @@ def run(target_spacing_zyx,
 
     Parameters
     ----------
-    target_spacing_zyx : np.ndarray
-        Target spacing of interpolated lung.
+    new_spacing_zyx : np.ndarray
+        Spacing of interpolated lung.
     bounding_box_buffer_yx_px : np.ndarray
-        Target spacing of interpolated lung.
+        Buffer for cropping the lung.
     data_type : {float32, int16}
         Output data type.
     HU_tissue_range : list of int
@@ -51,7 +51,6 @@ def run(target_spacing_zyx,
     if not os.path.exists(checkpoint_dir):
         raise ValueError('checkpoint_dir ' + checkpoint_dir + ' does not exist.')
     # init out file with tissue_range info
-    pipe.save_json({'HU_tissue_range': HU_tissue_range})
     n_threads = pipe.n_CPUs
     n_junks = int(np.ceil(pipe.n_patients / n_threads))
     pipe.log.info('processing ' + str(n_junks) + ' junks with ' + str(n_threads) + ' patients each')
@@ -64,12 +63,12 @@ def run(target_spacing_zyx,
                 break
             patients_junk.append(pipe.patients[patient_cnt])
         pipe.log.info('processing junk ' + str(junk_cnt))
-        process_junk(patients_junk, tf_net, **params)
+        process_junk(junk_cnt, patients_junk, tf_net, **params)
     with tf_tools.redirect_stdout():
         tf_net[0].close()
 
-def process_junk(patients_junk, tf_net,
-                 target_spacing_zyx,
+def process_junk(junk_cnt, patients_junk, tf_net,
+                 new_spacing_zyx,
                  bounding_box_buffer_yx_px,
                  data_type,
                  HU_tissue_range,
@@ -77,12 +76,11 @@ def process_junk(patients_junk, tf_net,
                  batch_size,
                  seg_max_shape_yx):
     sess, pred_ops, data = tf_net
-    # pipe.log.info('    resizing and interpolating scans') # heterogenous spacing -> homogeneous spacing
+    # resizing and interpolating scans: heterogenous spacing -> homogeneous spacing
     patients_json = dict(Parallel(n_jobs=min(pipe.n_CPUs, len(patients_junk)), verbose=100)(
-                                  delayed(process_patient)(patient, target_spacing_zyx, data_type)
+                                  delayed(process_patient)(patient, new_spacing_zyx, data_type)
                                   for patient in patients_junk))
-    # pipe.log.info('    segmenting lung wings and cropping the scan')
-    # start tensorflow session
+    # segmenting lung wings and cropping the scan
     for patient, pa_json in tqdm(patients_json.items()):
         config = json.load(open(checkpoint_dir + '/config.json'))
         img_array_zyx = pa_json['img_array_zyx']; del pa_json['img_array_zyx']
@@ -127,37 +125,49 @@ def process_junk(patients_junk, tf_net,
             pipe.log.warning('No lung wings found in scan of patient ' + patient + '. Taking the whole scan.')
             bound_box_coords_yx_px = [0, img_array_zyx.shape[0], 0, img_array_zyx.shape[1]]
         pa_json['bound_box_coords_yx_px'] = bound_box_coords_yx_px
+        # '+1': bounding box convention is the same as in gen_nodule_masks and interpolate_candidates
+        pa_json['bound_box_shape_yx_px'] = [bound_box_coords_yx_px[1] + 1 - bound_box_coords_yx_px[0], 
+                                            bound_box_coords_yx_px[3] + 1 - bound_box_coords_yx_px[2]]
         pa_json['basename'] = basename = patient + '_img.npy'
         pa_json['pathname'] = pipe.save_array(basename,
                                               img_array_zyx[:,
                                                             bound_box_coords_yx_px[0]:bound_box_coords_yx_px[1],
                                                             bound_box_coords_yx_px[2]:bound_box_coords_yx_px[3]])
         patients_json[patient] = pa_json
-    pipe.save_json(patients_json)
+    pipe.save_json('out.json', patients_json, mode='w' if junk_cnt == 0 else 'a')
 
-def process_patient(patient, target_spacing_zyx, data_type):
+def process_patient(patient, new_spacing_zyx, data_type):
     if pipe.dataset_name == 'LUNA16':
-        img_array_zyx, old_spacing_zyx, origin_zyx, acquisition_exception = get_img_array_mhd(pipe.patients_raw_data_paths[patient])
+        img_array_zyx, old_spacing_zyx, old_origin_zyx, acquisition_exception = get_img_array_mhd(pipe.patients_raw_data_paths[patient])
     elif pipe.dataset_name == 'dsb3':
-        img_array_zyx, old_spacing_zyx, origin_zyx, acquisition_exception = get_img_array_dcom(pipe.patients_raw_data_paths[patient])
-    new_shape_zyx = np.round(img_array_zyx.shape * np.array(old_spacing_zyx) / np.array(target_spacing_zyx))
-    resize_factor = new_shape_zyx / img_array_zyx.shape
-    new_spacing_zyx = list(np.array(old_spacing_zyx) / np.array(resize_factor))
+        img_array_zyx, old_spacing_zyx, old_origin_zyx, acquisition_exception = get_img_array_dcom(pipe.patients_raw_data_paths[patient])
     old_shape_zyx_px = img_array_zyx.shape
-    img_array_zyx = scipy.ndimage.interpolation.zoom(img_array_zyx if data_type=='int16' else img_array.astype(np.float32), resize_factor, order=3, mode='nearest')
-    return patient, OrderedDict([('img_array_zyx', img_array_zyx),
+    if data_type != 'int16':
+        array = array.astype(data_type)
+    img_array_zyx = resize_and_interpolate_array(img_array_zyx, old_spacing_zyx, new_spacing_zyx)
+    return patient, OrderedDict([('img_array_zyx', img_array_zyx), # new array
                                  ('resampled_scan_spacing_zyx_mm', new_spacing_zyx),
                                  ('resampled_scan_shape_zyx_px', img_array_zyx.shape),
-                                 ('raw_scan_spacing_zyx_mm', old_spacing_zyx),
+                                 ('raw_scan_spacing_zyx_mm', old_spacing_zyx), # info about original array
                                  ('raw_scan_shape_zyx_px', old_shape_zyx_px),
-                                 ('raw_scan_origin_zyx_mm', origin_zyx),
+                                 ('raw_scan_origin_zyx_mm', old_origin_zyx),
                                  ('acquisition_exception', acquisition_exception)])
+
+def resize_and_interpolate_array(img_array, old_spacing, new_spacing):
+    new_shape = np.round(img_array.shape * np.array(old_spacing) / np.array(new_spacing))
+    resize_factor = new_shape / img_array.shape
+    img_array = interpolate_array(img_array, resize_factor)
+    return img_array
+
+def interpolate_array(array, resize_factor):
+    return scipy.ndimage.interpolation.zoom(array, resize_factor, order=3, mode='nearest')
 
 def get_pre_normed_value_hist(img_array):
     hist,ran = np.histogram(img_array.flatten(), bins=16*5,normed=True, range=[-1000,600])
     return hist, ran
 
 def get_img_array_mhd(img_file):
+    """Image array in zyx convention with dtype = int16."""
     itk_img = sitk.ReadImage(img_file)
     img_array_zyx = sitk.GetArrayFromImage(itk_img) # indices are z, y, x 
     origin = itk_img.GetOrigin() # x, y, z  world coordinates (mm)
@@ -168,6 +178,7 @@ def get_img_array_mhd(img_file):
     return img_array_zyx, spacing_zyx, origin_zyx, acquisition_exception
 
 def get_img_array_dcom(img_file):
+    """Image array in zyx convention with dtype = int16."""
     def load_scan(path):
         patient = path.split('/')[-2]
         slices = [dicom.read_file(path + '/' + s) for s in os.listdir(path)]
@@ -175,8 +186,8 @@ def get_img_array_dcom(img_file):
         if len(unique_ac_nums) > 1:
             counts = [int(i) for i in counts]
             pipe.log.warning('Multiple scan exception, different acquisition numbers: {}'.format(unique_ac_nums))
-            pipe.log.warning('    Counts: {}'.format(counts))
             pipe.log.warning('    Patient {}'.format(patient))
+            pipe.log.warning('    Counts: {}'.format(counts))
             # celecting the index with the highest number of acquisitions. in case of balanced acquisitions,
             # selecting the latter, operation is string compatible
             selected_acquisition = unique_ac_nums[np.argwhere(counts == np.amax(counts))[-1][0]]

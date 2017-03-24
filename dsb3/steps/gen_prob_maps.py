@@ -1,15 +1,7 @@
-import sys
+import os, sys
 import numpy as np
-import pandas as pd
-import os
-import logging
-from datetime import datetime
 import json
-import glob
-import cv2
-import math
-import time
-import json
+from collections import OrderedDict
 from tqdm import tqdm
 from .. import pipeline as pipe
 from .. import tf_tools
@@ -32,33 +24,37 @@ def run(data_type,
         raise ValueError('Need same number of batch_sizes and image_shapes for nodule_seg.')
     if len(view_planes) == 0 or len([c for c in view_planes if c not in ['x', 'y', 'z']]) > 0:
         raise ValueError('view_planes ' + str(view_planes) + 'must only contain x, y, z chars.')
+    resample_lungs_json = pipe.load_json('out.json', 'resample_lungs')
+    if isinstance(resample_lungs_json, FileNotFoundError):
+        raise FileNotFoundError(str(resample_lungs_json) + '\n--> Run step "resample_lungs" first.')
+    HU_tissue_range = pipe.load_json('params.json', 'resample_lungs')['HU_tissue_range']
     # sort nets in ascending size y * x
     image_shapes = sorted(image_shapes, key=lambda shape: shape[0]*shape[1])
     # split patients by scan_shape for the nodule_segmentation_nets with distinct image_shapes -> save computing time
-    net_numbers_with_patients = [[] for n in range(len(image_shapes))]
+    patients_per_net = [[] for n in range(len(image_shapes))]
     registered_patients = set()
-    resample_lungs_dict = pipe.load_step('resample_lungs')
-    if isinstance(resample_lungs_dict, FileNotFoundError):
-        raise FileNotFoundError(str(resample_lungs_dict) + '\n--> Run step "resample_lungs" first.')
-    HU_tissue_range = resample_lungs_dict['HU_tissue_range']
     for net_num, net_shape in enumerate(image_shapes):
+        net_shape = [net_shape[0] for i in range(3)] # need three dimensions
         ratio = 1 if net_num == len(image_shapes) - 1 else image_shape_max_ratio # for avoiding border effects net due to padding, ...
         for patient in pipe.patients:
             if patient in registered_patients:
                 continue
-            scan_shape = resample_lungs_dict[patient]['resampled_scan_shape_zyx_px']
-            if (scan_shape[1] < int(ratio * net_shape[0]) and scan_shape[1] < int(ratio * net_shape[1]) 
-                and scan_shape[2] < int(ratio * net_shape[0]) and scan_shape[2] < int(ratio * net_shape[1])):
-                net_numbers_with_patients[net_num].append(patient)
+            scan_shape_z = resample_lungs_json[patient]['resampled_scan_shape_zyx_px'][0]
+            bound_box_coords_yx_px = resample_lungs_json[patient]['bound_box_coords_yx_px']
+            scan_shape_yx = [bound_box_coords_yx_px[1] + 1 - bound_box_coords_yx_px[0], 
+                             bound_box_coords_yx_px[3] + 1 - bound_box_coords_yx_px[2]]
+            scan_shape = [scan_shape_z] + scan_shape_yx
+            # does the scan fit into the shrinked net? it needs to fit in all three directions if we use all planes
+            if np.all(np.array(scan_shape) < ratio * np.array(net_shape)):
+                patients_per_net[net_num].append(patient)
                 registered_patients.add(patient)
     if len(registered_patients) != len(pipe.patients):
         raise ValueError('Registering patients for different nets is inconsistent.')
-    print('patients distribution on nets:', [len(l) for l in net_numbers_with_patients])
-    # loop over nodule_segmentation_nets with distinct image_shapes
-    patients_dict = {}
+    pipe.log.info('patients distribution on nets: ' + str([len(l) for l in patients_per_net]))
     reuse_init = True
-    for net_num, net_shape in enumerate(tqdm(image_shapes)):
-        if len(net_numbers_with_patients[net_num]) == 0:
+    # loop over nodule_segmentation_nets with distinct image_shapes
+    for net_num, net_shape in enumerate(image_shapes):
+        if len(patients_per_net[net_num]) == 0:
             continue
         reuse = None if reuse_init else True
         reuse_init = False
@@ -69,22 +65,24 @@ def run(data_type,
         prediction = np.zeros([batch_size] + list(label_shape), dtype=np.float32)
         prediction_rot = np.zeros_like(prediction)
         sess, pred_ops, data = tf_tools.load_network(checkpoint_dir, image_shape=image_shape, reuse=reuse)
-        print('predicting with net {} with x-y image shape {}'.format(net_num, net_shape))
+        pipe.log.info('predicting ' + str(len(patients_per_net[net_num])) 
+                      + ' patients with net {} with x-y image shape {}'.format(net_num, net_shape))
         # loop over patients in nets list
-        for patient in net_numbers_with_patients[net_num]:
-            org_img_array = pipe.load_array(resample_lungs_dict[patient]['basename'], step_name='resample_lungs') # z, y, x
+        patients_json = OrderedDict()
+        for patient in tqdm(patients_per_net[net_num]):
+            org_img_array = pipe.load_array(resample_lungs_json[patient]['basename'], step_name='resample_lungs') # z, y, x
             prob_map = np.zeros_like(org_img_array, dtype=np.float32)
             for view_plane_cnt, view_plane in enumerate(view_planes):
                 if view_plane_cnt > 0: # reload
-                    org_img_array = pipe.load_array(resample_lungs_dict[patient]['basename']) # z, y, x
+                    org_img_array = pipe.load_array(resample_lungs_json[patient]['basename']) # z, y, x
                 if org_img_array.dtype == np.int16: # [0, 1400] -> [-0.25, 0.75] normalized and zero_centered
                     org_img_array = (org_img_array/(HU_tissue_range[1] - HU_tissue_range[0]) - 0.25).astype(np.float32)
-                if view_plane == 'z':
-                    org_img_array = np.rollaxis(org_img_array, 0, 2) # y, x, z
+                if view_plane == 'x': # move z axis to position 1
+                    org_img_array = np.rollaxis(org_img_array, 0, 2) # z, y, x -> x, z, y
                 elif view_plane == 'y':
-                    org_img_array = np.swapaxes(org_img_array, 1, 2) # z, x, y
-                elif view_plane == 'x':
-                    org_img_array = np.swapaxes(org_img_array, 2, 0) # x, z, y ??? why do we have to do this?
+                    org_img_array = np.swapaxes(org_img_array, 1, 2) # -> z, x, y
+                elif view_plane == 'z':
+                    org_img_array = np.swapaxes(org_img_array, 2, 0) # -> x, y, z
                 # for example, if view_plane == 'z', then the 'z' dimension becomes the third dimension in img_array
                 #              and the convolution is performed in the first two dimensions, here the y-x dimensions
                 img_array = (-0.25) * np.ones((image_shape[0], image_shape[1], org_img_array.shape[2]), dtype=np.float32) # 'black' array
@@ -133,11 +131,11 @@ def run(data_type,
                     layer_start = batch_size * batch_cnt
                     layer_end = min(img_array.shape[2], batch_size + layer_start)
                     # TODO: is the following correct?
-                    if view_plane == 'z':
+                    if view_plane == 'x':
                         prob_map[:, :, layer_start:layer_end] += np.swapaxes(prediction_embed[:layer_end-layer_start, :, :, 0], 0, 2)
                     elif view_plane == 'y':
                         prob_map[:, layer_start:layer_end, :] += np.swapaxes(prediction_embed[:layer_end-layer_start, :, :, 0], 0, 1)
-                    elif view_plane == 'x':
+                    elif view_plane == 'z':
                         prob_map[layer_start:layer_end, :, :] +=  np.swapaxes(prediction_embed[:layer_end-layer_start, :, :, 0], 1, 2)
             if np.min(prob_map) < 0 or np.max(prob_map) > 1:
                  pipe.log.warning('nodule seg prob_map not in value range [0, 1] for patient ' + patient)
@@ -145,11 +143,11 @@ def run(data_type,
                 prob_map = (prob_map * 255).astype(np.uint8)
             elif data_type == 'uint16':
                 prob_map = (prob_map * 65535).astype(np.uint16)
-            patients_dict[patient] = {'basename': patient + '_prob_map.npy'}
-            path_name = pipe.save_array(patients_dict[patient]['basename'], prob_map)
-            patients_dict[patient] = {'pathname': path_name}
+            patients_json[patient] = OrderedDict()
+            patients_json[patient]['basename'] = basename = patient + '_prob_map.npy'
+            patients_json[patient]['pathname'] = pipe.save_array(basename, prob_map)
+        pipe.save_json('out.json', patients_json, mode='w' if reuse is None else 'a') # open in 'w' mode when something is written for the first time
         sess.close()
-    return patients_dict
 
 def rotate(in_tensor, M):
     dst = cv2.warpAffine(in_tensor, M, (in_tensor.shape[1], in_tensor.shape[0]), 
@@ -169,3 +167,4 @@ def rotate_3d(tensor, M, axis):
         for i in range(tensor.shape[2]):
             tensor[:, :, i] = rotate(tensor[:, :, i], M)
     return tensor
+

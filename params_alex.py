@@ -12,12 +12,12 @@ pipe = OrderedDict([
         'LUNA16': '/home/alex_wolf/storage/dsb3/data_raw/LUNA16/',
         'dsb3': '/home/alex_wolf/storage/dsb3/data_raw/dsb3/stage1/',
     }),
-    ('write_basedir', '/home/alex_wolf/storage/dsb3/alex_170322/'),
+    ('write_basedir', '/home/alex_wolf/storage/dsb3/alex_170323/'),
 # data splits
     ('random_seed', 17),
     ('tr_va_ho_split', [0.2, 0.8, 0]), # something like 0.15, 0.7, 0.15
 # technical parameters
-    ('n_CPUs', 5),
+    ('n_CPUs', 10),
     ('GPU_ids', [0]),
     ('GPU_memory_fraction', 0.85),
 ])
@@ -27,13 +27,12 @@ pipe = OrderedDict([
 # ------------------------------------------------------------------------------
 
 resample_lungs = OrderedDict([
-    ('target_spacing_zyx', [1, 1, 1]), # z, y, x
+    ('new_spacing_zyx', [1, 1, 1]), # z, y, x
     ('HU_tissue_range', [-1000, 400]), # MIN_BOUND, MAX_BOUND [-1000, 400]
     ('data_type', 'int16'), # int16 or float32
     ('bounding_box_buffer_yx_px', [12, 12]), # y, x
     ('seg_max_shape_yx', [512, 512]), # y, x
-    ('batch_size', 64), # 128 for target_spacing 0.5, 64 for target_spacing 1.0
-
+    ('batch_size', 64), # 128 for new_spacing 0.5, 64 for new_spacing 1.0
     ('checkpoint_dir', './checkpoints/resample_lungs/lung_wings_segmentation'),
 ])
 
@@ -42,9 +41,9 @@ gen_prob_maps = OrderedDict([
     ('view_planes', 'z'), # a string consisting of 'y', 'x', 'z'
     ('view_angles', [0]), # per view_plane in degrees, for example, [0, 45, -45]
     # more technical parameters
+    # valid shape numbers: 256, 304, 320, 352, 384, 400, 416, 448, 464, 480, 496, 512 (dividable by 16)
     ('image_shapes', [[304, 304], [320, 320], [352, 352], [384, 384], [400, 400], [416, 416],
                      [432, 432], [448, 448], [480, 480], [512, 512], [560, 560], [1024, 1024]]), # y, x
-                     # valid shape numbers: 256, 304, 320, 352, 384, 400, 416, 448, 464, 480, 496, 512 (dividable by 16)
     ('batch_sizes',  [32, 32, 24, 24, 16, 16, 16, 16, 12, 12, 4, 1]),
     ('data_type', 'uint8'), # uint8, int16 or float32
     ('image_shape_max_ratio', 0.95),
@@ -52,19 +51,16 @@ gen_prob_maps = OrderedDict([
 ])
 
 gen_candidates = OrderedDict([
-    ('max_n_candidates_per_patient', 20),
-    ('padding_candidates', True),
+    ('n_candidates', 20),
     ('threshold_prob_map', 0.2),
     ('cube_shape', (48, 48, 48)), # ensure cube_edges are dividable by two -> improvement possible
 ])
 
 interpolate_candidates = OrderedDict([
-    ('HR_target_spacing_yxz', [0.5, 0.5, 0.5]), # y, x, z
-    ('in_candidates_folder_name', '2017_03_15-20_56'), # '2017_03_11-08_06'
-    ('num_candidates', 20),
-    ('out_folder_name', 'multiview-3'),
-    ('out_datatype', 'uint8'),
-    ('out_candidates_shape_zyx', [96, 96, 96]),
+    ('n_candidates', 1),
+    ('new_spacing_zyx', [0.5, 0.5, 0.5]), # y, x, z
+    ('new_data_type', 'float32'),
+    ('new_candidates_shape_zyx', [96, 96, 96]),
     ('crop_raw_scan_buffer', 10),
 ])
 
@@ -85,13 +81,13 @@ gen_submission = OrderedDict([
 # ------------------------------------------------------------------------------
 
 gen_nodule_masks = OrderedDict([
-    ('ellipse_mode', True),
+    ('ellipse_mode', False),
     ('reduced_mask_radius_fraction', 0.5),
     ('mask2pred_lower_radius_limit_px', 3),
     ('mask2pred_upper_radius_limit_px', 15),
     ('LUNA16_annotations_csv_path', '../dsb3a_assets/LIDC-annotations_2_nodule-seg_annotations/annotations_min+missing_LUNA16_patients.csv'),
     ('yx_buffer_px', 1),
-    ('z_buffer_px', 0),
+    ('z_buffer_px', 2),
 ])
 
 gen_nodule_seg = OrderedDict([
@@ -110,4 +106,20 @@ gen_nodule_seg = OrderedDict([
     ('data_crop_size', [96, 96]), # y, x
     ('data_view_planes', 'yxz'), # 'y' enables y-plane as nodule view, 'yx' x- and y-plane, ... (order is variable)
     ('num_negative_examples_per_nodule_free_patient_per_view_plane', 40),
+])
+
+# ------------------------------------------------------------------------------
+# Eval parameters
+# ------------------------------------------------------------------------------
+
+gen_candidates_eval = OrderedDict([
+    ('max_n_candidates', 20),
+    ('max_dist_fraction', 0.5),
+    ('priority_threshold', 3), 
+    ('sort_candidates_by', 'prob_sum_min_nodule_size'),
+    ('all_patients', True)
+])
+
+gen_candidates_vis = OrderedDict([
+    ('inspect_what', 'true_positives')
 ])

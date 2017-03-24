@@ -70,8 +70,8 @@ def run(data_type,
         # loop over patients in nets list
         patients_json = OrderedDict()
         for patient in tqdm(patients_per_net[net_num]):
-            org_img_array = pipe.load_array(resample_lungs_json[patient]['basename'], step_name='resample_lungs') # z, y, x
-            prob_map = np.zeros_like(org_img_array, dtype=np.float32)
+            # org_img_array = pipe.load_array(resample_lungs_json[patient]['basename'], step_name='resample_lungs') # z, y, x
+            # prob_map = np.zeros_like(org_img_array, dtype=np.float32)
             # for view_plane_cnt, view_plane in enumerate(view_planes):
             #     if view_plane_cnt > 0: # reload
             #         org_img_array = pipe.load_array(resample_lungs_json[patient]['basename'], step_name='resample_lungs') # z, y, x
@@ -145,7 +145,7 @@ def run(data_type,
             #     prob_map = (prob_map * 65535).astype(np.uint16)
             patients_json[patient] = OrderedDict()
             patients_json[patient]['basename'] = basename = patient + '_prob_map.npy'
-            patients_json[patient]['pathname'] = pipe.save_array(basename, prob_map)
+            # patients_json[patient]['pathname'] = pipe.save_array(basename, prob_map)
         pipe.save_json('out.json', patients_json, mode='w' if reuse is None else 'a') # open in 'w' mode when something is written for the first time
         sess.close()
 

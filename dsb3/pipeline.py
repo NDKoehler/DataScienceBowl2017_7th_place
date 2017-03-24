@@ -119,7 +119,7 @@ def get_step_dir(step_name=None, run=None):
 
 def save_json(basename, d, step_name=None, mode='w'):
     if mode == 'a':
-        if os.path.exists(get_step_dir(step_name) + 'out.json' if basename is None else basename):
+        if os.path.exists(get_step_dir(step_name) + ('out.json' if basename is None else basename)):
             old_d = load_json(step_name)
             old_d.update(d)
             d = old_d

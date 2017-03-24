@@ -32,7 +32,7 @@ def init_pipeline(dataset_name,
     # locate input data files and init patient lists
     np.random.seed(random_seed)
     pipe._init_patients()
-    pipe._init_patients_by_label()
+    # pipe._init_patients_by_label()
     # pipe._init_patients_by_split(tr_va_ho_split)
     # technical parameters
     pipe.n_CPUs = n_CPUs

@@ -70,82 +70,82 @@ def run(data_type,
         # loop over patients in nets list
         patients_json = OrderedDict()
         for patient in tqdm(patients_per_net[net_num]):
-            # org_img_array = pipe.load_array(resample_lungs_json[patient]['basename'], step_name='resample_lungs') # z, y, x
-            # prob_map = np.zeros_like(org_img_array, dtype=np.float32)
-            # for view_plane_cnt, view_plane in enumerate(view_planes):
-            #     if view_plane_cnt > 0: # reload
-            #         org_img_array = pipe.load_array(resample_lungs_json[patient]['basename'], step_name='resample_lungs') # z, y, x
-            #     if org_img_array.dtype == np.int16: # [0, 1400] -> [-0.25, 0.75] normalized and zero_centered
-            #         org_img_array = (org_img_array/(HU_tissue_range[1] - HU_tissue_range[0]) - 0.25).astype(np.float32)
-            #     if view_plane == 'x': # move z axis to position 1
-            #         org_img_array = np.rollaxis(org_img_array, 0, 2) # z, y, x -> x, z, y
-            #     elif view_plane == 'y':
-            #         org_img_array = np.swapaxes(org_img_array, 1, 2) # -> z, x, y
-            #     elif view_plane == 'z':
-            #         org_img_array = np.swapaxes(org_img_array, 2, 0) # -> x, y, z
-            #     # for example, if view_plane == 'z', then the 'z' dimension becomes the third dimension in img_array
-            #     #              and the convolution is performed in the first two dimensions, here the y-x dimensions
-            #     img_array = (-0.25) * np.ones((image_shape[0], image_shape[1], org_img_array.shape[2]), dtype=np.float32) # 'black' array
-            #     # embed img in xy center in image_shape
-            #     offset_y = int((img_array.shape[0] - org_img_array.shape[0])/2)
-            #     offset_x = int((img_array.shape[1] - org_img_array.shape[1])/2)
-            #     img_array[offset_y : offset_y + org_img_array.shape[0],
-            #               offset_x : offset_x + org_img_array.shape[1], :] = org_img_array
-            #     num_batches = int(np.ceil(img_array.shape[2] / batch_size))
-            #     batch = (-0.25) * np.ones(([batch_size] + image_shape), dtype=np.float32)
-            #     batch_rot = batch.copy()
-            #     for batch_cnt in range(num_batches):
-            #         batch[:] = batch_rot[:] = -0.25 # reset to black
-            #         prediction[:] = prediction_rot[:] = 0 # reset to 0
-            #         for cnt in range(batch_size): # fill batch
-            #             layer_cnt = batch_cnt * batch_size + cnt
-            #             if layer_cnt >= img_array.shape[2]:
-            #                 break
-            #             # leave some channels above empty at top and below at bottom
-            #             min_z = max(0, int(layer_cnt - (image_shape[2] - 1) / 2))
-            #             max_z = min(int(layer_cnt + (image_shape[2] - 1) / 2) + 1, img_array.shape[2])
-            #             batch_idx_z = [image_shape[2] - max(0, max_z - min_z), image_shape[2] - min(0, max_z - min_z)]
-            #             batch[cnt, :, :, batch_idx_z[0]:batch_idx_z[1]] = img_array[:, :, min_z:max_z]
-            #         for view_angle in view_angles:
-            #             if view_angle != 0:
-            #                 M = cv2.getRotationMatrix2D((batch.shape[2]//2, batch.shape[1]//2), view_angle, 1)
-            #                 for img_cnt in range(batch.shape[0]):
-            #                     batch_rot[img_cnt] = rotate_3d(((batch[img_cnt].copy() + 0.25) * 255).astype(np.uint8), M, 2)/255 - 0.25
-            #             else:
-            #                 batch_rot = batch.copy()
-            #             # get probability for nodules and reshape flat prediction to batchsize, z, x, 1
-            #             prediction_rot = np.reshape(sess.run(pred_ops, feed_dict = {data['images']: batch_rot})['probs'], prediction.shape)
-            #             # below, np.clip is called, shouldn't the prediction stay above zero and below one?
-            #             if np.max(prediction_rot) > 1 or np.min(prediction_rot) < 0:
-            #                 pipe.log.warning('prediction not within [0, 1] for patient ' + patient)
-            #             # rotate back prediction
-            #             if view_angle != 0:
-            #                 M_back = cv2.getRotationMatrix2D((prediction_rot.shape[2]//2, prediction_rot.shape[1]//2), -view_angle, 1)
-            #                 for img_cnt in range(batch.shape[0]):
-            #                     prediction_rot[img_cnt] = np.clip(rotate_3d((prediction_rot[img_cnt] * 255).astype(np.uint8), M_back, 2) / 255, 0, 1)
-            #             # mean over view_angles
-            #             prediction += prediction_rot / len(view_angles)
-            #         # crop from embedded layers
-            #         prediction_embed = prediction[:, offset_y : offset_y + org_img_array.shape[0],
-            #                                          offset_x : offset_x + org_img_array.shape[1]] / len(view_planes)
-            #         layer_start = batch_size * batch_cnt
-            #         layer_end = min(img_array.shape[2], batch_size + layer_start)
-            #         # TODO: is the following correct?
-            #         if view_plane == 'x':
-            #             prob_map[:, :, layer_start:layer_end] += np.swapaxes(prediction_embed[:layer_end-layer_start, :, :, 0], 0, 2)
-            #         elif view_plane == 'y':
-            #             prob_map[:, layer_start:layer_end, :] += np.swapaxes(prediction_embed[:layer_end-layer_start, :, :, 0], 0, 1)
-            #         elif view_plane == 'z':
-            #             prob_map[layer_start:layer_end, :, :] +=  np.swapaxes(prediction_embed[:layer_end-layer_start, :, :, 0], 1, 2)
-            # if np.min(prob_map) < 0 or np.max(prob_map) > 1:
-            #      pipe.log.warning('nodule seg prob_map not in value range [0, 1] for patient ' + patient)
-            # if data_type == 'uint8':
-            #     prob_map = (prob_map * 255).astype(np.uint8)
-            # elif data_type == 'uint16':
-            #     prob_map = (prob_map * 65535).astype(np.uint16)
+            org_img_array = pipe.load_array(resample_lungs_json[patient]['basename'], step_name='resample_lungs') # z, y, x
+            prob_map = np.zeros_like(org_img_array, dtype=np.float32)
+            for view_plane_cnt, view_plane in enumerate(view_planes):
+                if view_plane_cnt > 0: # reload
+                    org_img_array = pipe.load_array(resample_lungs_json[patient]['basename'], step_name='resample_lungs') # z, y, x
+                if org_img_array.dtype == np.int16: # [0, 1400] -> [-0.25, 0.75] normalized and zero_centered
+                    org_img_array = (org_img_array/(HU_tissue_range[1] - HU_tissue_range[0]) - 0.25).astype(np.float32)
+                if view_plane == 'x': # move z axis to position 1
+                    org_img_array = np.rollaxis(org_img_array, 0, 2) # z, y, x -> x, z, y
+                elif view_plane == 'y':
+                    org_img_array = np.swapaxes(org_img_array, 1, 2) # -> z, x, y
+                elif view_plane == 'z':
+                    org_img_array = np.swapaxes(org_img_array, 2, 0) # -> x, y, z
+                # for example, if view_plane == 'z', then the 'z' dimension becomes the third dimension in img_array
+                #              and the convolution is performed in the first two dimensions, here the y-x dimensions
+                img_array = (-0.25) * np.ones((image_shape[0], image_shape[1], org_img_array.shape[2]), dtype=np.float32) # 'black' array
+                # embed img in xy center in image_shape
+                offset_y = int((img_array.shape[0] - org_img_array.shape[0])/2)
+                offset_x = int((img_array.shape[1] - org_img_array.shape[1])/2)
+                img_array[offset_y : offset_y + org_img_array.shape[0],
+                          offset_x : offset_x + org_img_array.shape[1], :] = org_img_array
+                num_batches = int(np.ceil(img_array.shape[2] / batch_size))
+                batch = (-0.25) * np.ones(([batch_size] + image_shape), dtype=np.float32)
+                batch_rot = batch.copy()
+                for batch_cnt in range(num_batches):
+                    batch[:] = batch_rot[:] = -0.25 # reset to black
+                    prediction[:] = prediction_rot[:] = 0 # reset to 0
+                    for cnt in range(batch_size): # fill batch
+                        layer_cnt = batch_cnt * batch_size + cnt
+                        if layer_cnt >= img_array.shape[2]:
+                            break
+                        # leave some channels above empty at top and below at bottom
+                        min_z = max(0, int(layer_cnt - (image_shape[2] - 1) / 2))
+                        max_z = min(int(layer_cnt + (image_shape[2] - 1) / 2) + 1, img_array.shape[2])
+                        batch_idx_z = [image_shape[2] - max(0, max_z - min_z), image_shape[2] - min(0, max_z - min_z)]
+                        batch[cnt, :, :, batch_idx_z[0]:batch_idx_z[1]] = img_array[:, :, min_z:max_z]
+                    for view_angle in view_angles:
+                        if view_angle != 0:
+                            M = cv2.getRotationMatrix2D((batch.shape[2]//2, batch.shape[1]//2), view_angle, 1)
+                            for img_cnt in range(batch.shape[0]):
+                                batch_rot[img_cnt] = rotate_3d(((batch[img_cnt].copy() + 0.25) * 255).astype(np.uint8), M, 2)/255 - 0.25
+                        else:
+                            batch_rot = batch.copy()
+                        # get probability for nodules and reshape flat prediction to batchsize, z, x, 1
+                        prediction_rot = np.reshape(sess.run(pred_ops, feed_dict = {data['images']: batch_rot})['probs'], prediction.shape)
+                        # below, np.clip is called, shouldn't the prediction stay above zero and below one?
+                        if np.max(prediction_rot) > 1 or np.min(prediction_rot) < 0:
+                            pipe.log.warning('prediction not within [0, 1] for patient ' + patient)
+                        # rotate back prediction
+                        if view_angle != 0:
+                            M_back = cv2.getRotationMatrix2D((prediction_rot.shape[2]//2, prediction_rot.shape[1]//2), -view_angle, 1)
+                            for img_cnt in range(batch.shape[0]):
+                                prediction_rot[img_cnt] = np.clip(rotate_3d((prediction_rot[img_cnt] * 255).astype(np.uint8), M_back, 2) / 255, 0, 1)
+                        # mean over view_angles
+                        prediction += prediction_rot / len(view_angles)
+                    # crop from embedded layers
+                    prediction_embed = prediction[:, offset_y : offset_y + org_img_array.shape[0],
+                                                     offset_x : offset_x + org_img_array.shape[1]] / len(view_planes)
+                    layer_start = batch_size * batch_cnt
+                    layer_end = min(img_array.shape[2], batch_size + layer_start)
+                    # TODO: is the following correct?
+                    if view_plane == 'x':
+                        prob_map[:, :, layer_start:layer_end] += np.swapaxes(prediction_embed[:layer_end-layer_start, :, :, 0], 0, 2)
+                    elif view_plane == 'y':
+                        prob_map[:, layer_start:layer_end, :] += np.swapaxes(prediction_embed[:layer_end-layer_start, :, :, 0], 0, 1)
+                    elif view_plane == 'z':
+                        prob_map[layer_start:layer_end, :, :] +=  np.swapaxes(prediction_embed[:layer_end-layer_start, :, :, 0], 1, 2)
+            if np.min(prob_map) < 0 or np.max(prob_map) > 1:
+                 pipe.log.warning('nodule seg prob_map not in value range [0, 1] for patient ' + patient)
+            if data_type == 'uint8':
+                prob_map = (prob_map * 255).astype(np.uint8)
+            elif data_type == 'uint16':
+                prob_map = (prob_map * 65535).astype(np.uint16)
             patients_json[patient] = OrderedDict()
             patients_json[patient]['basename'] = basename = patient + '_prob_map.npy'
-            # patients_json[patient]['pathname'] = pipe.save_array(basename, prob_map)
+            patients_json[patient]['pathname'] = pipe.save_array(basename, prob_map)
         pipe.save_json('out.json', patients_json, mode='w' if reuse is None else 'a') # open in 'w' mode when something is written for the first time
         sess.close()
 

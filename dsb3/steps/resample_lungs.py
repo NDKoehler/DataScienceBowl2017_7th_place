@@ -52,7 +52,7 @@ def run(new_spacing_zyx,
         raise ValueError('checkpoint_dir ' + checkpoint_dir + ' does not exist.')
     # init out file with tissue_range info
     n_threads = pipe.n_CPUs
-    n_junks = int(np.ceil(pipe.n_patients / n_threads))
+    n_junks = int(np.ceil(pipe.n_patients/ n_threads))
     pipe.log.info('processing ' + str(n_junks) + ' junks with ' + str(n_threads) + ' patients each')
     tf_net = tf_tools.load_network(checkpoint_dir)
     for junk_cnt in range(n_junks):
@@ -119,9 +119,9 @@ def process_junk(junk_cnt, patients_junk, tf_net,
         layers_coords = [[yx_coords[x] for yx_coords in crop_coords_z_list_yx_px] for x in range(4)]
         if [True, True, True, True] == [True if len(x) > 0 else False for x in layers_coords]:
             bound_box_coords_yx_px = [max(0, min(layers_coords[0]) - bounding_box_buffer_yx_px[0]),
-                                      min(img_array_zyx.shape[0], max(layers_coords[1]) + bounding_box_buffer_yx_px[0]),
+                                      min(img_array_zyx.shape[1], max(layers_coords[1]) + bounding_box_buffer_yx_px[0]),
                                       max(0, min(layers_coords[2]) - bounding_box_buffer_yx_px[1]),
-                                      min(img_array_zyx.shape[1], max(layers_coords[3]) + bounding_box_buffer_yx_px[1])]
+                                      min(img_array_zyx.shape[2], max(layers_coords[3]) + bounding_box_buffer_yx_px[1])]
         else:
             pipe.log.warning('No lung wings found in scan of patient ' + patient + '. Taking the whole scan.')
             bound_box_coords_yx_px = [0, img_array_zyx.shape[0], 0, img_array_zyx.shape[1]]
@@ -276,7 +276,7 @@ def get_crop_idx_yx(pred, crop_coords, invers_scale_yx):
     max_x = []
     # delete too small contours
     for cnt in contours:
-        if cv2.contourArea(cnt) < 5: continue
+        if cv2.contourArea(cnt) < 3: continue
         if cnt.shape[0] < 3: continue
         min_y.append(np.min(cnt[:, 0, 1]))
         max_y.append(np.max(cnt[:, 0, 1]))
@@ -305,7 +305,7 @@ def seg_preprocessing(img_array_zyx, config, scale_yx, HU_tissue_range):
             pipe.log.error('Data transformation did not work! Observed values greater than 256 before transforming to uint8!')
         img_array_zyx = img_array_zyx.astype(np.uint8)
     elif img_array_zyx.dtype == np.int16:
-        img_array_zyx = ((img_array_zyx / (HU_tissue_range[1] - HU_tissue_range[0])) * 255).astype(np.uint8)
+        img_array_zyx = ((img_array_zyx / float(HU_tissue_range[1] - HU_tissue_range[0])) * 255).astype(np.uint8)
     crop_coords_yx = [int(x) for x in np.array(img_array_zyx.shape[1:]) * scale_yx]
     img_array_zyx_out = np.zeros(([img_array_zyx.shape[0]] + config['image_shape'][:2]), dtype=np.float32) # config['image_shape'] is y, x, z
     for layer_cnt in range(img_array_zyx.shape[0]):

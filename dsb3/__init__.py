@@ -1,6 +1,7 @@
 import os
 import numpy as np
 from collections import OrderedDict
+from . import utils
 
 def init_pipeline(dataset_name,
                   raw_data_dirs,
@@ -23,17 +24,16 @@ def init_pipeline(dataset_name,
     pipe.dataset_name = dataset_name # the dataset identifier
     pipe.raw_data_dir = raw_data_dirs[dataset_name] # the raw data
     # create base directory
-    if not os.path.exists(write_basedir):
-        os.makedirs(write_basedir)
     pipe.write_basedir = write_basedir.rstrip('/') + '/'
+    utils.ensure_dir(pipe.get_write_dir())
     pipe.n_patients = n_patients
     # logger for the whole pipeline, to be invoked by `pipe.log.info(msg)`, for example
     pipe._init_log()
     # locate input data files and init patient lists
     np.random.seed(random_seed)
     pipe._init_patients()
-    # pipe._init_patients_by_label()
-    # pipe._init_patients_by_split(tr_va_ho_split)
+    if pipe._init_patients_by_label():
+        pipe._init_patients_by_split(tr_va_ho_split)
     # technical parameters
     pipe.n_CPUs = n_CPUs
     pipe.GPU_memory_fraction = GPU_memory_fraction

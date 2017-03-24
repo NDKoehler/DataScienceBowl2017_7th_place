@@ -24,7 +24,10 @@ def run(LUNA16_annotations_csv_path,
     # all patients in list have nodules, not a single patient without nodules.
     nodule_patients_set = set(annotations['seriesuid'].values.tolist()) & set(pipe.patients)
     # process nodule patients
-    resample_lungs_json = pipe.load_json('out.json', 'resample_lungs')
+    try:
+        resample_lungs_json = pipe.load_json('out.json', 'resample_lungs')
+    except FileNotFoundError:
+        raise ValueError('Run step "resample_lungs" first!')
     pipe.log.info('process nodule patients')
     # nothing memory intensive here, so this works fine
     if True:

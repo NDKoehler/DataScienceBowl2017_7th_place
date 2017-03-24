@@ -7,6 +7,7 @@ from tqdm import tqdm
 from collections import OrderedDict
 from joblib import Parallel, delayed
 from .. import pipeline as pipe
+from .. import utils
 
 # rank the candidatess / clusters according to the following score
 sort_clusters_by = 'prob_sum_min_nodule_size'
@@ -77,18 +78,20 @@ def process_patient(patient,
     prob_map_X_norm = prob_map[prob_map_points_px[:, 0], prob_map_points_px[:, 1], prob_map_points_px[:, 2]].astype('float32') / 255
     dbscan_args = prob_map_points_mm, prob_map_points_px, prob_map_X_norm, avg_n_points_per_cmm
     clusters = dbscan(*dbscan_args)
+    # the clusters might be overly large, split them if this is the case
     clusters = split_clusters(clusters, cube_shape, prob_map.shape, dbscan_args,
                               threshold=threshold_prob_map)
-    # print('found', len(clusters), 'clusters in', len(prob_map_points_mm), 'points')
-    clusters = get_candidates_box_coords(clusters, cube_shape, prob_map.shape)
-    clusters = get_candidates_array(clusters, prob_map, 'prob_map', cube_shape, threshold_prob_map)
+    # now we are sure that the clusters are small enough to fit into the boxes
+    # get the boxes around the clusters and the corresponding arrays
+    clusters = get_clusters_box_coords(clusters, cube_shape)
+    clusters = get_clusters_array(clusters, cube_shape, prob_map, 'prob_map')
     # sort clusters, trunkate clusters, clean the cluster dict
     clusters = sort_clusters(clusters, key=sort_clusters_by)
     clusters = clusters[:n_candidates]
     clusters = remove_masks_from_clusters(clusters)
-
+    # fill clusters with the original image data
     img_array = pipe.load_array(resample_lungs_json[patient]['basename'], 'resample_lungs')
-    clusters = get_candidates_array(clusters, img_array.copy(), 'img', cube_shape)
+    clusters = get_clusters_array(clusters, cube_shape, img_array.copy(), 'img')
     patient_json = OrderedDict()
     if pipe.dataset_name == 'dsb3':
         # set cancer labels
@@ -110,32 +113,32 @@ def process_patient(patient,
                             count_nodules_prio_greater_2 += 1
                             break
         patient_json['label'] = count_nodules_prio_greater_2 > 0
-    patient_json['clusters'] = [] # this is a sorted list of candidates
-    patient_json['candidates_lst'] = []
+    patient_json['clusters'] = [] # this stores all the information about the candidates
+    patient_json['candidates_lst'] = [] # this is a sorted list of candidates
     can_img_paths = []; can_prob_map_paths = []
     for cluster_cnt, clu in enumerate(clusters):
-        patient_json['clusters'].append({})
+        patient_json['clusters'].append(OrderedDict())
         cluster_json = patient_json['clusters'][cluster_cnt]
         # save candidate from img_array
-        cluster_json['img_basename'] = basename = patient + '_%02d_img.npy' % (cluster_cnt)
-        cluster_json['img_path'] = pipe.save_array(basename, clu['candidate_img_array'].astype(np.float32))
+        cluster_json['img_basename'] = basename = patient + '_{:02}_img.npy'.format(cluster_cnt)
+        cluster_json['img_path'] = pipe.save_array(basename, clu['img_array'].astype(np.float32))
         can_img_paths.append(cluster_json['img_path'])
         # save candidate from prob_map
-        basename = patient + '_%02d_prob_map.npy'
+        basename = patient + '_{:02}_prob_map.npy'.format(cluster_cnt)
         cluster_json['prob_map_basename'] = basename
-        cluster_json['prob_map_path'] = pipe.save_array(basename, clu['candidate_prob_map_array'].astype(np.float32))
+        cluster_json['prob_map_path'] = pipe.save_array(basename, clu['prob_map_array'].astype(np.float32))
         can_prob_map_paths.append(cluster_json['prob_map_path'])
         # check cluster_shape
-        if clu['candidate_prob_map_array'].shape != tuple(cube_shape):
-            pipe.log.error('Wrong shape {} for patient  {}'.format(clu['candidate_prob_map_array'].shape, patient))
+        if clu['prob_map_array'].shape != tuple(cube_shape):
+            raise ValueError('Wrong shape {} for patient  {}'.format(clu['prob_map_array'].shape, patient))
         # save some cluster info
         cluster_json['prob_max_cluster'] = int(clu['prob_max_cluster'])  # is all in units of 255
         cluster_json['prob_sum_cluster'] = int(clu['prob_sum_cluster'])
-        cluster_json['prob_sum_candidate'] = int(clu['prob_sum_candidate'])
+        cluster_json['prob_sum_cluster'] = int(clu['prob_sum_cluster'])
         cluster_json['prob_sum_min_nodule_size'] = int(clu['prob_sum_min_nodule_size'])
         cluster_json['size_points_cluster'] = int(clu['size_points_cluster'])
         cluster_json['center_px'] = [int(x) for x in clu['center_px']]
-        cluster_json['candidate_box_coords_zyx_px'] = [int(clu['candidate_box_coords'][k]) for k  in ['min_z', 'max_z', 'min_y', 'max_y', 'min_x', 'max_x']]
+        cluster_json['box_coords_px'] = clu['box_coords_px']
         # candidate classification info
         if pipe.dataset_name == 'LUNA16':
             patient_json['candidates_lst'].append('{}_{}\t{}\t{}\t{}\n'.format(patient, cluster_cnt, 
@@ -143,6 +146,26 @@ def process_patient(patient,
     patient_json['patients_lst'] = '{}\t{}\t{}\t{}\n'.format(patient, patient_json['label'],
                                                              ','.join(can_img_paths), ','.join(can_prob_map_paths))
     return patient, patient_json
+
+def get_clusters_box_coords(clusters, cube_shape):
+    for cluster in clusters:
+        cluster_center = cluster['center_px']
+        box_coords = []
+        for coord in range(3):
+            start = int(cluster_center[coord] - cube_shape[coord]/2)
+            box_coords += [start]
+            box_coords += [start + cube_shape[coord]]
+        cluster['box_coords_px'] = box_coords
+    return clusters
+
+def get_clusters_array(clusters, cube_shape, array, array_name):
+    for cluster in clusters:
+        cluster[array_name + '_array'] = utils.crop_and_embed(array, cluster['box_coords_px'], cube_shape)
+        if array_name == 'img':
+            cluster[array_name + '_array'] = cluster[array_name + '_array'].astype(np.int16)
+        elif 'prob_map' in array_name:
+            cluster[array_name + '_array'] = cluster[array_name + '_array'].astype(np.uint8)
+    return clusters
 
 def dbscan(X_mm, X_px, weights, avg_n_points_per_cmm=1):
     """
@@ -159,8 +182,8 @@ def dbscan(X_mm, X_px, weights, avg_n_points_per_cmm=1):
     """
     # if there are no non-zero entries
     if X_mm.shape[0] == 0: return []
-    min_nodule_weight = 0.2 * avg_n_points_per_cmm
-    min_nodule_size = int(20 * avg_n_points_per_cmm)
+    min_nodule_weight = 0.2 * avg_n_points_per_cmm # this is hard-coded and affects the clustering
+    min_nodule_size = int(20 * avg_n_points_per_cmm) # this is hard coded and only affects the ranking
     # epsilon is in units mm, min_samples includes the point itself
     # on 1mm x 1mm x 1mm, we've seen prob_maps with just 4 high prob values that correspond to a nodule
     # only returns core_samples, therefore clusters might be smaller than min_nodule_size
@@ -192,7 +215,7 @@ def dbscan(X_mm, X_px, weights, avg_n_points_per_cmm=1):
         clusters.append(clu)
     return clusters
 
-def split_clusters(clusters, cube_shape, total_shape, dbscan_args, threshold=0.05, check=False, padding=True):
+def split_clusters(clusters, cube_shape, total_shape, dbscan_args=None, threshold=0.05, check=False):
     clusters_remove_indices = []
     clusters_append = []
     threshold_base = threshold
@@ -201,7 +224,7 @@ def split_clusters(clusters, cube_shape, total_shape, dbscan_args, threshold=0.0
         cluster_center = clu['center_px']
         can_coords = {}
         for coord, coord_name in enumerate(['y', 'x', 'z']):
-            min_ = int(cluster_center[coord]-cube_shape[coord]/2)
+            min_ = int(cluster_center[coord] - cube_shape[coord]/2)
             max_ = min_ + cube_shape[coord]
             if clu['min_px'][coord] < min_ or clu['max_px'][coord] > max_:
                 # print('cluster', cluster_cnt, 'with center', clu['center_px'], 'too large in', coord_name, 'direction')
@@ -211,9 +234,8 @@ def split_clusters(clusters, cube_shape, total_shape, dbscan_args, threshold=0.0
                 while threshold_param < 1000:
                     threshold_param *= 1.03
                     threshold = threshold_base + np.tanh(threshold_param-1)*(1-threshold_base)
-                    # print(threshold, end=' ')
-                    mask_threshold = weights[mask_cluster] > threshold
                     X_mm, X_px, weights, avg_n_points_per_cmm = dbscan_args
+                    mask_threshold = weights[mask_cluster] > threshold
                     clusters_split = dbscan(X_mm[mask_cluster][mask_threshold], 
                                             X_px[mask_cluster][mask_threshold], 
                                             weights[mask_cluster][mask_threshold],
@@ -241,46 +263,6 @@ def split_clusters(clusters, cube_shape, total_shape, dbscan_args, threshold=0.0
             del clusters[i]
         clusters += clusters_append
         return clusters
-
-def get_candidates_box_coords(clusters, cube_shape, total_shape, padding=True):
-    for cluster in clusters:
-        cluster_center = cluster['center_px']
-        can_coords = {}
-        for coord, coord_name in enumerate(['y', 'x', 'z']):
-            if padding:
-                min_ = int(cluster_center[coord]-cube_shape[coord]/2)
-                max_ = min_ + cube_shape[coord]
-            else:
-                min_ = int(min(max(cluster_center[coord]-cube_shape[coord]/2, 0), total_shape[coord]-cube_shape[coord]))
-                max_ = min_ + cube_shape[coord]
-            can_coords['min_' + coord_name] = min_
-            can_coords['max_' + coord_name] = max_
-        cluster['candidate_box_coords'] = can_coords
-    return clusters
-
-def get_candidates_array(clusters, array, array_name, cube_shape, threshold_prob_map=0.05):
-    total_shape = array.shape
-    for cluster_cnt, cluster in enumerate(clusters):
-        coords = cluster['candidate_box_coords']
-        if array_name == 'img' and array.dtype != np.int16:
-            raise ValueError('Wrong data type.')
-        if array_name == 'prob_map' and array.dtype != np.uint8:
-            raise ValueError('Wrong data type.')
-        if array_name=='img':
-            cluster['candidate_'+array_name+'_array'] = np.zeros(cube_shape, dtype=np.int16)
-        elif array_name=='prob_map':
-            cluster['candidate_'+array_name+'_array'] = np.zeros(cube_shape, dtype=np.uint8)
-
-        cluster['candidate_'+array_name+'_array'][abs(coords['min_y']) if coords['min_y']<0 else 0: cube_shape[0] if coords['max_y']<=total_shape[0] else -(coords['max_y']-total_shape[0]),
-                                              abs(coords['min_x']) if coords['min_x']<0 else 0: cube_shape[1] if coords['max_x']<=total_shape[1] else -(coords['max_x']-total_shape[1]),
-                                              abs(coords['min_z']) if coords['min_z']<0 else 0: cube_shape[2] if coords['max_z']<=total_shape[2] else -(coords['max_z']-total_shape[2])]\
-                                                      = array[0 if coords['min_y']<0 else coords['min_y']: total_shape[0] if coords['max_y']>total_shape[0] else coords['max_y'],
-                                                              0 if coords['min_x']<0 else coords['min_x']: total_shape[1] if coords['max_x']>total_shape[1] else coords['max_x'],
-                                                              0 if coords['min_z']<0 else coords['min_z']: total_shape[2] if coords['max_z']>total_shape[2] else coords['max_z']]
-        if array_name == 'prob_map':
-            mask_threshold = cluster['candidate_prob_map_array'] > threshold_prob_map * 255
-            cluster['prob_sum_candidate'] = np.sum(cluster['candidate_prob_map_array'][mask_threshold])
-    return clusters
 
 def sort_clusters(clusters, key='prob_sum_cluster'):
     sorted_clusters = sorted(clusters, key=lambda cluster: cluster[key], reverse=True)

@@ -13,13 +13,25 @@ from joblib import Parallel, delayed
 from matplotlib import pyplot as plt
 from . import resample_lungs
 from .. import pipeline as pipe
-
+from .. import utils
 
 def run(n_candidates,
         new_spacing_zyx,
         new_candidates_shape_zyx,
         new_data_type,
         crop_raw_scan_buffer):
+    """
+    n_candidates : int
+        Number of candidates to interpolate. Should be lower or as high as the 
+        number of low resolution candidates produced in `gen_candidates`.
+    new_spacing_zyx : tuple of len 3
+        Spacing as (z, y, x).
+    new_candidates_shape_zyx : tuple of len 3
+        For example (96, 96, 96).
+    new_data_type : {'uint8', 'int16', 'float32'}
+    crop_raw_scan_buffer : int
+        Number of pixels to add to raw scan buffer.
+    """
     avail_data_types = ['uint8', 'int16', 'float32']
     if new_data_type not in avail_data_types:
         raise ValueError('Wrong data type, choose one of ' + str(avail_data_types))
@@ -30,11 +42,13 @@ def run(n_candidates,
     img_candidates_lsts_dict = OrderedDict()
     for split_name, split in pipe.patients_by_split.items():
         img_lsts_dict[split_name] = input_lst[input_lst[0].isin(split)]
+        img_lsts_dict[split_name].reset_index(drop=True, inplace=True)
     if pipe.dataset_name == 'LUNA16':
         input_lst_candidates = pd.read_csv(pipe.get_step_dir('gen_candidates') + 'candidates.lst', sep = '\t', header=None)
         for split_name, split in pipe.patients_by_split.items():
             truncated_first_column = pd.Series([name.split('_')[0] for name in input_lst_candidates[0]])
             img_candidates_lsts_dict[split_name] = input_lst_candidates[truncated_first_column.isin(split)]
+            img_candidates_lsts_dict[split_name].reset_index(drop=True, inplace=True)
     for lst_type in img_lsts_dict.keys():
         pipe.log.info('processing lst {} with len {}'.format(lst_type, len(img_lsts_dict[lst_type])))
         if len(img_lsts_dict[lst_type]) == 0:
@@ -93,7 +107,8 @@ def gen_data(lst_type,
                                                              crop_raw_scan_buffer,
                                                              new_data_type,
                                                              new_candidates_shape_zyx,
-                                                             new_spacing_zyx) for line_num in junk)
+                                                             new_spacing_zyx,
+                                                             HU_tissue_range) for line_num in junk)
         for junk_result in junk_lst:
             patient, patient_label, images, prob_maps = junk_result
             images = np.array(images, dtype=np.int16)
@@ -131,49 +146,36 @@ def gen_patients_candidates(line_num,
                             crop_raw_scan_buffer,
                             new_data_type,
                             new_candidates_shape_zyx,
-                            new_spacing_zyx):
+                            new_spacing_zyx,
+                            HU_tissue_range):
     patient = img_lst_patients[0][line_num]
     patient_label = img_lst_patients[1][line_num]
     lung_box_coords_zyx_px = [0, 0] + resample_lungs_json[patient]['bound_box_coords_yx_px'] # offset from lung_wings
-    lung_box_offset_zzyyxx_px = [lung_box_coords_zyx_px[i // 2] for i in range(6)]
+    lung_box_offset_zzyyxx_px = [lung_box_coords_zyx_px[2*j] for j in range(3) for i in range(2)]
     raw_scan_spacing_zyx_mm_px = resample_lungs_json[patient]['raw_scan_spacing_zyx_mm']
     resampled_scan_spacing_zyx_mm_px = resample_lungs_json[patient]['resampled_scan_spacing_zyx_mm']
-    HU_tissue_range = resample_lungs_json['HU_tissue_range']
-    convert2raw_scan_spacing_factor = np.array(resampled_scan_spacing_zyx_mm_px) / np.array(raw_scan_spacing_zyx_mm_px, dtype=np.float32) #zyx
+    convert2raw_scan_spacing_factor = np.array(resampled_scan_spacing_zyx_mm_px, dtype='float32') / np.array(raw_scan_spacing_zyx_mm_px) #zyx
     convert2raw_scan_spacing_factor = [convert2raw_scan_spacing_factor[j] for j in range(3) for i in range(2)] #zzyyxx
     if pipe.dataset_name == 'LUNA16':
-        lung_array_zyx, old_spacing_zyx, _, _ = resample_lungs.get_img_array_mhd(pipe.patients_raw_data_paths[patient])
+        raw_lung_array, old_spacing_zyx, _, _ = resample_lungs.get_img_array_mhd(pipe.patients_raw_data_paths[patient])
     elif pipe.dataset_name == 'dsb3':
-        lung_array_zyx, old_spacing_zyx, _, _ = resample_lungs.get_img_array_dcom(pipe.patients_raw_data_paths[patient])
+        raw_lung_array, old_spacing_zyx, _, _ = resample_lungs.get_img_array_dcom(pipe.patients_raw_data_paths[patient])
     clusters = gen_candidates_json[patient]['clusters']
     images = []; prob_maps = []
     for clu_num, clu in enumerate(clusters[:min(len(clusters), n_candidates)]):
-        candidate_box_coords_zyx_px = np.array(clu['candidate_box_coords_zyx_px']) + np.array(lung_box_offset_zzyyxx_px)
-        candidate_box_coords_raw_zyx_px = [((candidate_box_coords_zyx_px[dim] - crop_raw_scan_buffer) 
-                                             if dim % 2 == 0 else
-                                            (candidate_box_coords_zyx_px[dim] + crop_raw_scan_buffer)) * convert2raw_scan_spacing_factor[dim]
-                                             for dim in range(6)]
-        # '+ 1': convention is that box coords contain candidate but don't go beyond, see also gen_nodules_masks
-        z_start = int(max(0, candidate_box_coords_raw_zyx_px[0]))
-        z_end   = int(min(candidate_box_coords_raw_zyx_px[1] + 1, lung_array_zyx.shape[0]))
-        y_start = int(max(0, candidate_box_coords_raw_zyx_px[2]))
-        y_end   = int(min(candidate_box_coords_raw_zyx_px[3] + 1, lung_array_zyx.shape[1]))
-        x_start = int(max(0, candidate_box_coords_raw_zyx_px[4]))
-        x_end   = int(min(candidate_box_coords_raw_zyx_px[5] + 1, lung_array_zyx.shape[2]))
-        image = lung_array_zyx[z_start:z_end, y_start:y_end, x_start:x_end].copy()
-        image = resample_lungs.resize_and_interpolate_array(image, old_spacing_zyx, new_spacing_zyx)
+        candidate_box_coords_zyx_px = list(np.array(clu['box_coords_px']) + np.array(lung_box_offset_zzyyxx_px))
+        crop_raw = [int(np.round(candidate_box_coords_zyx_px[dim] * convert2raw_scan_spacing_factor[dim])) for dim in range(6)]
+        crop_raw = [int(max(0, crop_raw[i] - 1)) # tiny buffer here
+                    if i % 2 == 0 else 
+                    int(min(crop_raw[i] + 1, raw_lung_array.shape[i // 2])) for i in range(6)]
+        image_raw = raw_lung_array[crop_raw[0]:crop_raw[1], crop_raw[2]:crop_raw[3], crop_raw[4]:crop_raw[5]].copy()
+        image = resample_lungs.resize_and_interpolate_array(image_raw, old_spacing_zyx, new_spacing_zyx)
         image = resample_lungs.clip_HU_range(image, HU_tissue_range)
-        image_box = np.zeros(new_candidates_shape_zyx, dtype='int16')
-        # offset_z = int((image_box.shape[0] - image.shape[0])/2)
-        # offset_y = int((image_box.shape[1] - image.shape[1])/2)
-        # offset_x = int((image_box.shape[2] - image.shape[2])/2)
-        # image_box[offset_z : offset_z + image.shape[0],
-        #           offset_y : offset_y + image.shape[1],
-        #           offset_x : offset_x + image.shape[2]] = image
-        image = image[:new_candidates_shape_zyx[0],
-                      :new_candidates_shape_zyx[1],
-                      :new_candidates_shape_zyx[2]]
-        # load low-resolution prob_map and resize to high-resolution
+        # consider accounting for an offset as in gen_prob_maps
+        new_shape = new_candidates_shape_zyx
+        new_box = [int((image.shape[i // 2] - new_shape[i // 2])/2) if i %2 == 0 
+                   else int((image.shape[i // 2] - new_shape[i // 2])/2) + new_shape[i // 2] for i in range(6)]
+        image = utils.crop_and_embed(image, new_box, new_shape)
         # 'int16': account for that interpolation that might induce values below 0 or above 255
         prob_map = pipe.load_array(clu['prob_map_basename'], 'gen_candidates').astype('int16') # z, y, x
         prob_map = resample_lungs.resize_and_interpolate_array(prob_map, resampled_scan_spacing_zyx_mm_px, new_spacing_zyx)
@@ -182,13 +184,16 @@ def gen_patients_candidates(line_num,
                             :new_candidates_shape_zyx[1],
                             :new_candidates_shape_zyx[2]]
         # visualize
-        if np.random.randint(0, 1) == 0:
+        if np.random.randint(0, 100) == 0:
             old_image = pipe.load_array(clu['img_basename'], 'gen_candidates')
             plt.imshow(old_image[old_image.shape[0] // 2, :, :])
             plt.savefig(pipe.get_step_dir() + 'figs/' + patient + '_can' + str(clu_num) + '_imgold.png')
             plt.clf()
             plt.imshow(image[image.shape[0] // 2, :, :])
             plt.savefig(pipe.get_step_dir() + 'figs/' + patient + '_can' + str(clu_num) + '_imgnew.png')
+            plt.clf()
+            plt.imshow(image_raw[image_raw.shape[0] // 2, :, :])
+            plt.savefig(pipe.get_step_dir() + 'figs/' + patient + '_can' + str(clu_num) + '_imgraw.png')
             plt.clf()
             old_prob_map = pipe.load_array(clu['prob_map_basename'], 'gen_candidates')
             plt.imshow(old_prob_map[old_prob_map.shape[0] // 2, :, :])

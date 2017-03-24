@@ -30,7 +30,7 @@ def load_network(checkpoint_dir, image_shape=None, reuse=None):
         init_op = tf.global_variables_initializer()
         sess = tf.Session(config=tf.ConfigProto(gpu_options=tf.GPUOptions(per_process_gpu_memory_fraction=pipe.GPU_memory_fraction),
                                                 allow_soft_placement=True,
-                                                log_device_placement=config['allow_soft_placement']))
+                                                log_device_placement=False))
         sess.run(init_op)
         data = {'images': tf.placeholder(dtype=tf.float32, shape=[None] + image_shape, name='image_placeholder')}
         with tf.device('/gpu:' + os.environ['CUDA_VISIBLE_DEVICES']):

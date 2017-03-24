@@ -105,7 +105,8 @@ def process_junk(junk_cnt, patients_junk, tf_net,
             z_crop_idx = [batch_cnt * batch_size, min((batch_cnt + 1) * batch_size, img_array_seg_zyx.shape[0])]
             batch[:z_crop_idx[1] - z_crop_idx[0], :, :, :] = img_array_seg_zyx[z_crop_idx[0] : z_crop_idx[1], :, :, :]
             # lung_wings segmentation
-            prediction = sess.run(pred_ops, feed_dict = {data['images']: batch})['probs']
+            with tf_tools.redirect_stdout():
+                prediction = sess.run(pred_ops, feed_dict = {data['images']: batch})['probs']
             prediction = np.reshape(prediction, tuple([batch_size] + config['label_shape'][:2] + [1]))
             prediction = seg_postprocessing(prediction)
             # evaluate prediction -> get crop idx
@@ -153,14 +154,14 @@ def process_patient(patient, new_spacing_zyx, data_type):
                                  ('raw_scan_origin_zyx_mm', old_origin_zyx),
                                  ('acquisition_exception', acquisition_exception)])
 
-def resize_and_interpolate_array(img_array, old_spacing, new_spacing):
+def resize_and_interpolate_array(img_array, old_spacing, new_spacing, order=3):
     new_shape = np.round(img_array.shape * np.array(old_spacing) / np.array(new_spacing))
     resize_factor = new_shape / img_array.shape
     img_array = interpolate_array(img_array, resize_factor)
     return img_array
 
-def interpolate_array(array, resize_factor):
-    return scipy.ndimage.interpolation.zoom(array, resize_factor, order=3, mode='nearest')
+def interpolate_array(array, resize_factor, order=3):
+    return scipy.ndimage.interpolation.zoom(array, resize_factor, order=order, mode='nearest')
 
 def get_pre_normed_value_hist(img_array):
     hist,ran = np.histogram(img_array.flatten(), bins=16*5,normed=True, range=[-1000,600])

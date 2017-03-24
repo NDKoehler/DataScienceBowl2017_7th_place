@@ -12,7 +12,7 @@ pipe = OrderedDict([
         'LUNA16': '/home/alex_wolf/storage/dsb3/data_raw/LUNA16/',
         'dsb3': '/home/alex_wolf/storage/dsb3/data_raw/dsb3/stage1/',
     }),
-    ('write_basedir', '/home/alex_wolf/storage/dsb3/alex_170323/'),
+    ('write_basedir', '/home/alex_wolf/storage/dsb3/alex_170323_test/'),
 # data splits
     ('random_seed', 17),
     ('tr_va_ho_split', [0.2, 0.8, 0]), # something like 0.15, 0.7, 0.15
@@ -57,7 +57,7 @@ gen_candidates = OrderedDict([
 ])
 
 interpolate_candidates = OrderedDict([
-    ('n_candidates', 1),
+    ('n_candidates', 10),
     ('new_spacing_zyx', [0.5, 0.5, 0.5]), # y, x, z
     ('new_data_type', 'float32'),
     ('new_candidates_shape_zyx', [96, 96, 96]),

@@ -20,11 +20,12 @@ avail_dataset_names = ['LUNA16', 'dsb3']
 avail_steps = OrderedDict([
     ('0', 'resample_lungs'),
     ('1', 'gen_prob_maps'),
-    ('2', 'gen_candidates'),
-    ('2eval', 'gen_candidates_eval'),
-    ('2vis', 'gen_candidates_vis'),
-    ('3', 'interpolate_candidates'),
-    ('4', 'gen_nodule_masks'),
+    ('2', 'gen_nodule_masks'),
+    ('3', 'gen_candidates'),
+    ('3eval', 'gen_candidates_eval'),
+    ('3vis', 'gen_candidates_vis'),
+    ('4', 'interpolate_candidates'),
+    ('5', 'filter_candidates'),
 ])
 
 avail_runs = OrderedDict([])
@@ -289,8 +290,9 @@ def _init_patients_by_label():
                     patients_by_label[label] = [patient for patient in patients if nodule_masks_json[patient]['nodule_patient'] == bool(label)]
                 json.dump(patients_by_label, open(filename, 'w'), indent=4)
             except FileNotFoundError:
-                print('Could not create splits. Run step "gen_nodule_masks" first.')
-                log_pipe.warning('Could not create splits. Run step "gen_nodule_masks" first.')
+                print('Could not create splits and patients with labels list. Run step "gen_nodule_masks" first.')
+                log_pipe.warning('Could not create splits and patients with labels list. Run step "gen_nodule_masks" first.')
+                return False
         elif dataset_name == 'dsb3':
             import pandas as pd
             dsb3_labels = pd.read_csv('/'.join(raw_data_dir.split('/')[:-2]) + '/stage1_labels.csv')
@@ -303,6 +305,8 @@ def _init_patients_by_label():
                     patients_label[patient]['cancer_label'] = -1
             json.dump(patients_by_label, open(filename, 'w'), indent=4)
             json.dump(patients_label, open(filename2, 'w'), indent=4)
+    return True
+
 
 def _init_patients_by_split(tr_va_ho_split, tr_va_ho_split_file=None):
     if sum(tr_va_ho_split) != 1:
@@ -317,6 +321,7 @@ def _init_patients_by_split(tr_va_ho_split, tr_va_ho_split_file=None):
         for label in [1, 0]:
             idx_start = 0
             for split_cnt, split in enumerate(['tr', 'va', 'ho']):
+                # print(tr_va_ho_split, patients_by_label[label])
                 idx_end = idx_start + int(tr_va_ho_split[split_cnt] * len(patients_by_label[label])) + 1
                 patients_by_label_split[str(label) + '_' + split] = patients_by_label[label][idx_start:idx_end]
                 idx_start = idx_end

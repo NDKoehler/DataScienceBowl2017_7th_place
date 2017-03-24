@@ -33,17 +33,16 @@ def run(inspect_what='false_negatives'):
             img_path = gen_resample_lungs_json[patient]['pathname']
             prob_map = np.load(prob_map_path)
             prob_map_thresh = prob_map.copy()
-            prob_map_thresh[prob_map_thresh < threshold_prob_map*255] = 0.0
-
+            prob_map_thresh[prob_map_thresh < threshold_prob_map * 255] = 0.0 # here prob_map is in units of 255
             if inspect_what in ['true_positives', 'false_negatives']:
                 nodules = gen_nodule_masks_json[patient]['nodules']
-                clusters = [{'center_px': nodules[nodule_cnt]['center_zyx_px']}]
+                clusters = [{'center_px': nodules[nodule_cnt]['center_zyx_px']}] # center the candidate on the nodule
                 print('patient', patient, 'nodule', nodule_cnt)
                 print('... nodule center', nodules[nodule_cnt]['center_zyx_px'])
             else:
-                candidates = gen_candidates_json[patient]['clusters']
-                candidates = gen_can.sort_clusters(candidates, key=gen_candidates_eval['sort_candidates_by'])
-                candidate = candidates[int(cand_cnt)]
+                clusters = gen_candidates_json[patient]['clusters']
+                clusters = gen_candidates.sort_clusters(clusters, key=gen_candidates_eval['sort_candidates_by'])
+                candidate = clusters[int(cand_cnt)]
                 clusters = [{'center_px': candidate['center_px']}]
                 print('patient', patient, 'candidate', cand_cnt)
                 print('... candidate center', candidate['center_px'], 'prob_sum_cluster', candidate['prob_sum_cluster'], 'prob_sum_candidate', candidate['prob_sum_candidate'])
@@ -54,23 +53,20 @@ def run(inspect_what='false_negatives'):
                     print('... nodule', nodule_cnt)
                     print('... nodule center', nodules[str(nodule_cnt)]['center_zyx_px'])                
             img_array = np.load(img_path)
-            clusters = gen_candidates.get_candidates_box_coords(clusters, cube_shape, prob_map.shape)
-            # clusters = gen_candidates.get_candidates_array(clusters, prob_map, 'prob_map', cube_shape, prob_map.shape, padding=False)
-            # clusters = gen_candidates.get_candidates_array(clusters, prob_map_thresh, 'prob_map_thresh', cube_shape, prob_map.shape, padding=False)
-            # clusters = gen_candidates.get_candidates_array(clusters, img_array, 'img', cube_shape, prob_map.shape)
-            clusters = get_candidates_array(clusters, prob_map, 'prob_map')
+            clusters = gen_candidates.get_clusters_box_coords(clusters, cube_shape)
+            clusters = gen_candidates.get_clusters_array(clusters, cube_shape, prob_map, 'prob_map')
             if inspect_what == 'false_negatives':
-                print('... prob_sum_around_nodule', np.sum(clusters[0]['candidate_prob_map_array']))
-                candidates = gen_candidatesdidates_json['patients'][patient]['clusters']
+                print('... prob_sum_around_nodule', np.sum(clusters[0]['prob_map_array']))
+                candidates = gen_candidates_json['patients'][patient]['clusters']
                 candidates = gen_candidates.sort_clusters(candidates, key=gen_candidates_eval['sort_candidates_by'])
                 dists = [np.linalg.norm(np.array(candidate['center_px']) - np.array(nodules[nodule_cnt]['center_zyx_px'])) for candidate in candidates]                
                 ican = np.argmin(dists)
                 print('... closest candidate center', candidates[ican]['center_px'], 'rank', ican)
-            clusters = get_candidates_array(clusters, prob_map_thresh, 'prob_map_thresh')
-            clusters = get_candidates_array(clusters, img_array, 'img')
-            nod_prob_map = clusters[0]['candidate_prob_map_array']
-            nod_prob_map_thresh = clusters[0]['candidate_prob_map_thresh_array']
-            nod_img_array = clusters[0]['candidate_img_array']
+            clusters = gen_candidates.get_clusters_array(clusters, cube_shape, prob_map_thresh, 'prob_map_thresh')
+            clusters = gen_candidates.get_clusters_array(clusters, cube_shape, img_array, 'img')
+            nod_prob_map = clusters[0]['prob_map_array']
+            nod_prob_map_thresh = clusters[0]['prob_map_thresh_array']
+            nod_img_array = clusters[0]['img_array']
             # plotting
             plot_nodule_prob_map_img(nod_prob_map, nod_prob_map_thresh, nod_img_array)
             # plot_img_2d_slice(nod_img_array)
@@ -133,10 +129,4 @@ def plot_nodule_prob_map_img(nod_prob_map, nod_prob_map_thresh, nod_img_array):
 def plot_img_2d_slice(array_zyx):
     z_idx = int(array_zyx.shape[0] / 2)
     plt.imshow(array_zyx[z_idx, :, :])
-
-def get_candidates_array(clusters, array, array_name):     
-    for clu in clusters:             
-        coords = clu['candidate_box_coords']             
-        clu['candidate_'+array_name+'_array'] = array[coords['min_y']:coords['max_y'], coords['min_x']:coords['max_x'], coords['min_z']:coords['max_z']]
-    return clusters
 

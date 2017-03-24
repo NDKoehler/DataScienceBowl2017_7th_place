@@ -296,15 +296,18 @@ def _init_patients_by_label():
         elif dataset_name == 'dsb3':
             import pandas as pd
             dsb3_labels = pd.read_csv('/'.join(raw_data_dir.split('/')[:-2]) + '/stage1_labels.csv')
-            for label in [1, 0, -1]:
-                patients_by_label[label] = dsb3_labels['id'].loc[dsb3_labels['cancer'] == label].tolist()
-            for patient in patients:
-                if patient in set(dsb3_labels['id'].values.tolist()):
-                    patients_label[patient]['cancer_label'] = dsb3_labels['cancer'].loc[dsb3_labels['id'] == patient].tolist()[0]
-                else:
-                    patients_label[patient]['cancer_label'] = -1
-            json.dump(patients_by_label, open(filename, 'w'), indent=4)
-            json.dump(patients_label, open(filename2, 'w'), indent=4)
+            try:
+                for label in [1, 0, -1]:
+                    patients_by_label[label] = dsb3_labels['id'].loc[dsb3_labels['cancer'] == label].tolist()
+                for patient in patients:
+                    if patient in set(dsb3_labels['id'].values.tolist()):
+                        patients_label[patient]['cancer_label'] = dsb3_labels['cancer'].loc[dsb3_labels['id'] == patient].tolist()[0]
+                    else:
+                        patients_label[patient]['cancer_label'] = -1
+                json.dump(patients_by_label, open(filename, 'w'), indent=4)
+                json.dump(patients_label, open(filename2, 'w'), indent=4)
+            except KeyError:
+                print('Deal with the KeyError here!')
     return True
 
 

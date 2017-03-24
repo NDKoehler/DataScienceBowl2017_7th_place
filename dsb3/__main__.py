@@ -72,7 +72,7 @@ def main():
     if args.n_patients is not None:
         params.pipe['n_patients'] = args.n_patients
     if args.dataset_name is not None:
-        dataset_name = args.dataset_name_gpu
+        dataset_name = args.dataset_name
         params.pipe['dataset_name'] = dataset_name
     if args.gpu is not None:
         GPU_id = args.gpu

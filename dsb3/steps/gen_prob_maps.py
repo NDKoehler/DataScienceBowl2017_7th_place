@@ -74,7 +74,7 @@ def run(data_type,
             prob_map = np.zeros_like(org_img_array, dtype=np.float32)
             for view_plane_cnt, view_plane in enumerate(view_planes):
                 if view_plane_cnt > 0: # reload
-                    org_img_array = pipe.load_array(resample_lungs_json[patient]['basename']) # z, y, x
+                    org_img_array = pipe.load_array(resample_lungs_json[patient]['basename'], step_name='resample_lungs') # z, y, x
                 if org_img_array.dtype == np.int16: # [0, 1400] -> [-0.25, 0.75] normalized and zero_centered
                     org_img_array = (org_img_array/(HU_tissue_range[1] - HU_tissue_range[0]) - 0.25).astype(np.float32)
                 if view_plane == 'x': # move z axis to position 1

@@ -50,7 +50,6 @@ def run(n_candidates,
             img_candidates_lsts_dict[split_name] = input_lst_candidates[truncated_first_column.isin(split)]
             img_candidates_lsts_dict[split_name].reset_index(drop=True, inplace=True)
     for lst_type in img_lsts_dict.keys():
-        pipe.log.info('processing lst {} with len {}'.format(lst_type, len(img_lsts_dict[lst_type])))
         if len(img_lsts_dict[lst_type]) == 0:
             continue
         img_lst_patients = img_lsts_dict[lst_type]
@@ -62,6 +61,11 @@ def run(n_candidates,
         open(pipe.get_step_dir() + lst_type + '_patients.lst', 'w').close()
         if pipe.dataset_name == 'LUNA16':
             open(pipe.get_step_dir() + lst_type + '_candidates.lst', 'w').close()
+        #reduce imglist to n_patients
+        if pipe.n_patients > 0:
+            img_lst_patients = img_lst_patients[img_lst_patients[0].isin(list(pipe.patients_raw_data_paths.keys())) ]
+        pipe.log.info('processing lst {} with len {}'.format(lst_type, len(img_lst_patients)))
+
         gen_data(lst_type,
                  img_lst_patients,
                  img_lst_candidates,

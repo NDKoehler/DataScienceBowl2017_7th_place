@@ -57,7 +57,7 @@ gen_candidates = OrderedDict([
 ])
 
 interpolate_candidates = OrderedDict([
-    ('n_candidates', 1),
+    ('n_candidates', 20),
     ('new_spacing_zyx', [0.5, 0.5, 0.5]), # y, x, z
     ('new_data_type', 'float32'),
     ('new_candidates_shape_zyx', [64, 64, 64]),
@@ -117,7 +117,7 @@ gen_candidates_eval = OrderedDict([
     ('max_dist_fraction', 0.5),
     ('priority_threshold', 3), 
     ('sort_candidates_by', 'prob_sum_min_nodule_size'),
-    ('all_patients', False)
+    ('all_patients', True)
 ])
 
 gen_candidates_vis = OrderedDict([

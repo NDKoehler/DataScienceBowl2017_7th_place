@@ -134,17 +134,18 @@ def process_patient(patient,
         # save some cluster info
         cluster_json['prob_max_cluster'] = int(clu['prob_max_cluster'])  # is all in units of 255
         cluster_json['prob_sum_cluster'] = int(clu['prob_sum_cluster'])
-        cluster_json['prob_sum_cluster'] = int(clu['prob_sum_cluster'])
         cluster_json['prob_sum_min_nodule_size'] = int(clu['prob_sum_min_nodule_size'])
         cluster_json['size_points_cluster'] = int(clu['size_points_cluster'])
         cluster_json['center_px'] = [int(x) for x in clu['center_px']]
         cluster_json['box_coords_px'] = clu['box_coords_px']
         # candidate classification info
         if pipe.dataset_name == 'LUNA16':
+            cluster_json['nodule_priority'] = clu['nodule_priority']
             patient_json['candidates_lst'].append('{}_{}\t{}\t{}\t{}\n'.format(patient, cluster_cnt, 
                                                                                clu['nodule_priority'], cluster_json['img_path'], cluster_json['prob_map_path']))
     patient_json['patients_lst'] = '{}\t{}\t{}\t{}\n'.format(patient, patient_json['label'],
                                                              ','.join(can_img_paths), ','.join(can_prob_map_paths))
+    
     return patient, patient_json
 
 def get_clusters_box_coords(clusters, cube_shape):

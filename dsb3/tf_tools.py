@@ -4,7 +4,7 @@ import json
 from contextlib import contextmanager
 from . import pipeline as pipe
 
-def load_network(checkpoint_dir, image_shape=None, reuse=None):
+def load_network(checkpoint_dir, image_shape=None, reuse=None, batch_size=None):
     with redirect_stdout():
         config = json.load(open(checkpoint_dir + '/config.json'))
         if image_shape is None:
@@ -32,7 +32,7 @@ def load_network(checkpoint_dir, image_shape=None, reuse=None):
                                                 allow_soft_placement=True,
                                                 log_device_placement=False))
         sess.run(init_op)
-        data = {'images': tf.placeholder(dtype=tf.float32, shape=[None] + image_shape, name='image_placeholder')}
+        data = {'images': tf.placeholder(dtype=tf.float32, shape=[batch_size] + image_shape, name='image_placeholder')}
         with tf.device('/gpu:' + os.environ['CUDA_VISIBLE_DEVICES']):
             config['dropout'] = 1.0
             output, endpoints = model(data=data,

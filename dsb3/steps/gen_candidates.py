@@ -32,19 +32,22 @@ def run(n_candidates,
     # write both patients and candidates list
     patients_lst_path = pipe.get_step_dir() + 'patients.lst'
     patients_lst = open(patients_lst_path, 'w')
-    if pipe.dataset_name == 'LUNA16':
+    # if pipe.dataset_name == 'LUNA16':
+    if 1:
         candidates_lst_path = pipe.get_step_dir() + 'candidates.lst'
         candidates_lst = open(candidates_lst_path, 'w')
     for patient_cnt, patient in enumerate(tqdm(pipe.patients)):
         patients_lst.write(patients_candidates_json[patient]['patients_lst'])
         del patients_candidates_json[patient]['patients_lst']
-        if pipe.dataset_name == 'LUNA16':
+        # if pipe.dataset_name == 'LUNA16':
+        if 1:
             for line in patients_candidates_json[patient]['candidates_lst']:
                 candidates_lst.write(line)
             del patients_candidates_json[patient]['candidates_lst']
     patients_lst.close()
     print('wrote', patients_lst_path)
-    if pipe.dataset_name == 'LUNA16':
+    # if pipe.dataset_name == 'LUNA16':
+    if 1:
         candidates_lst.close()
         print('wrote', candidates_lst_path)
     pipe.save_json('out.json', patients_candidates_json)
@@ -95,7 +98,7 @@ def process_patient(patient,
     patient_json = OrderedDict()
     if pipe.dataset_name == 'dsb3':
         # set cancer labels
-        patient_json['label'] = pipe.patients_labels[patient]
+        patient_json['label'] = pipe.patients_label[patient]
     else:
         # set nodule labels
         gen_nodule_masks_json_patient = gen_nodule_masks_json[patient]
@@ -143,6 +146,10 @@ def process_patient(patient,
             cluster_json['nodule_priority'] = clu['nodule_priority']
             patient_json['candidates_lst'].append('{}_{}\t{}\t{}\t{}\n'.format(patient, cluster_cnt, 
                                                                                clu['nodule_priority'], cluster_json['img_path'], cluster_json['prob_map_path']))
+        elif pipe.dataset_name == 'dsb3':
+            patient_json['candidates_lst'].append('{}_{}\t{}\t{}\t{}\n'.format(patient, cluster_cnt, 
+                                                                               patient_json['label'], cluster_json['img_path'], cluster_json['prob_map_path']))
+
     patient_json['patients_lst'] = '{}\t{}\t{}\t{}\n'.format(patient, patient_json['label'],
                                                              ','.join(can_img_paths), ','.join(can_prob_map_paths))
     

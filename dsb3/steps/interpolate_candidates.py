@@ -43,12 +43,14 @@ def run(n_candidates,
     for split_name, split in pipe.patients_by_split.items():
         img_lsts_dict[split_name] = input_lst[input_lst[0].isin(split)]
         img_lsts_dict[split_name].reset_index(drop=True, inplace=True)
-    if pipe.dataset_name == 'LUNA16':
+    # if pipe.dataset_name == 'LUNA16':
+    if 1:
         input_lst_candidates = pd.read_csv(pipe.get_step_dir('gen_candidates') + 'candidates.lst', sep = '\t', header=None)
         for split_name, split in pipe.patients_by_split.items():
             truncated_first_column = pd.Series([name.split('_')[0] for name in input_lst_candidates[0]])
             img_candidates_lsts_dict[split_name] = input_lst_candidates[truncated_first_column.isin(split)]
             img_candidates_lsts_dict[split_name].reset_index(drop=True, inplace=True)
+
     for lst_type in img_lsts_dict.keys():
         if len(img_lsts_dict[lst_type]) == 0:
             continue
@@ -118,12 +120,6 @@ def gen_data(lst_type,
             # take n_candidates or less
             images = np.array(images, dtype=np.int16)[:n_candidates]
             prob_maps = np.array(prob_maps, dtype=np.uint8)[:n_candidates]
-            # get num real (not filled) candidates
-            num_real_candidates = images.shape[0]
-            # fill in zeros if there are less than n_candidates in the array
-            if images.shape[0] < n_candidates:
-                images = np.vstack((images, np.zeros([n_candidates - images.shape[0]] + list(images.shape[1:]), dtype='int16')))
-                prob_maps = np.vstack((prob_maps, np.zeros([n_candidates - prob_maps.shape[0]] + list(prob_maps.shape[1:]), dtype='int16')))
             if new_data_type == 'uint8':
                 images = (images / (float(HU_tissue_range[1] - HU_tissue_range[0])) * 255).astype(np.uint8) # [0, 255]
             elif new_data_type == 'float32':
@@ -135,22 +131,13 @@ def gen_data(lst_type,
                 f.write('{}\t{}\t{}\n'.format(patient, patient_label, path))
             if pipe.dataset_name == 'LUNA16':
                 with open(pipe.get_step_dir() + lst_type + '_candidates.lst', 'a') as f:
-                    for cnt in range(n_candidates):
-                        if cnt < num_real_candidates:
-                            cand = img_lst_candidates[0][cand_line_num]
-                            cand_label = img_lst_candidates[1][cand_line_num]
-                            if not cand.startswith(patient):
-                                raise ValueError(cand + ' needs to start with ' + patient)
-                            path = pipe.save_array(cand + '.npy', images_and_prob_maps[cnt])
-                            f.write('{}\t{}\t{}\n'.format(cand, cand_label, path))
-                            cand_line_num += 1
-                        else:
-                            cand = patient + '_' + str(cnt)
-                            cand_label = 0
-                            if not cand.startswith(patient):
-                                raise ValueError(cand + ' needs to start with ' + patient)
-                            path = pipe.save_array(cand + '.npy', images_and_prob_maps[cnt])
-                            f.write('{}\t{}\t{}\n'.format(cand, cand_label, path))
+                    for cnt in range(images.shape[0]):
+                        cand = img_lst_candidates[0][cand_line_num]
+                        cand_label = img_lst_candidates[1][cand_line_num]
+                        if not cand.startswith(patient):
+                            raise ValueError(cand + ' needs to start with ' + patient)
+                        f.write('{}\t{}\t{}\n'.format(cand, cand_label, path))
+                        cand_line_num += 1
             cand_line_num += n_candidates_gen - n_candidates
 
 def gen_patients_candidates(line_num,

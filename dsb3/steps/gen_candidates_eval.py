@@ -42,8 +42,11 @@ def run(max_n_candidates=20, max_dist_fraction=0.5, priority_threshold=3,
 
     global gen_nodule_masks_json, gen_candidates_json, gen_candidates_params, considered_patients
     gen_nodule_masks_json = pipe.load_json('out.json', 'gen_nodule_masks')
-    gen_candidates_json = pipe.load_json('out.json', 'gen_candidates')
     gen_candidates_params = pipe.load_json('params.json', 'gen_candidates')
+    if sort_candidates_by=='nodule_score':
+        gen_candidates_json = pipe.load_json('out.json', 'filter_candidates')
+    else:
+	gen_candidates_json = pipe.load_json('out.json', 'gen_candidates')    
     considered_patients = pipe.patients if all_patients else pipe.patients_by_split['va']
     single_patient = pipe.patients[0] if pipe.n_patients == 1 else None
     global_score = get_global_rank(sort_candidates_by, gen_candidates_json )
@@ -104,7 +107,8 @@ def get_global_rank(sort_candidates_by, patient_json):
     for patient_cnt, patient in enumerate(considered_patients):
         single_pat = patient_json[patient]
         for clu in single_pat['clusters']:
-            nodule_rank = clu[sort_candidates_by]
+            nodule_rank = float(clu[sort_candidates_by])
+            nodule_rank = 0 if nodule_rank<0 else nodule_rank
             nodule_priority = clu['nodule_priority']
             scores.append(nodule_rank)
             labels.append(nodule_priority)

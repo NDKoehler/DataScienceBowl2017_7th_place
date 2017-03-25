@@ -131,14 +131,22 @@ def gen_data(lst_type,
                 f.write('{}\t{}\t{}\n'.format(patient, patient_label, path))
             if pipe.dataset_name == 'LUNA16':
                 with open(pipe.get_step_dir() + lst_type + '_candidates.lst', 'a') as f:
-                    for cnt in range(num_real_candidates):
-                        cand = img_lst_candidates[0][cand_line_num]
-                        cand_label = img_lst_candidates[1][cand_line_num]
-                        if not cand.startswith(patient):
-                            raise ValueError(cand + ' needs to start with ' + patient)
-                        path = pipe.save_array(cand + '.npy', images_and_prob_maps[cnt])
-                        f.write('{}\t{}\t{}\n'.format(cand, cand_label, path))
-                        cand_line_num += 1
+                    for cnt in range(n_candidates):
+                        if cnt < num_real_candidates:
+                            cand = img_lst_candidates[0][cand_line_num]
+                            cand_label = img_lst_candidates[1][cand_line_num]
+                            if not cand.startswith(patient):
+                                raise ValueError(cand + ' needs to start with ' + patient)
+                            path = pipe.save_array(cand + '.npy', images_and_prob_maps[cnt])
+                            f.write('{}\t{}\t{}\n'.format(cand, cand_label, path))
+                            cand_line_num += 1
+                        else:
+                            cand = patient + '_' + str(cnt)
+                            cand_label = 0
+                            if not cand.startswith(patient):
+                                raise ValueError(cand + ' needs to start with ' + patient)
+                            path = pipe.save_array(cand + '.npy', images_and_prob_maps[cnt])
+                            f.write('{}\t{}\t{}\n'.format(cand, cand_label, path))
             cand_line_num += n_candidates_gen - n_candidates
 
 def gen_patients_candidates(line_num,

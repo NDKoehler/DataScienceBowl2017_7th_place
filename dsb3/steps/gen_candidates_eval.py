@@ -39,12 +39,14 @@ def run(max_n_candidates=20, max_dist_fraction=0.5, priority_threshold=3,
     all_patients : bool
         Consider all patients instead of only validation set.
     """
+
     global gen_nodule_masks_json, gen_candidates_json, gen_candidates_params, considered_patients
     gen_nodule_masks_json = pipe.load_json('out.json', 'gen_nodule_masks')
     gen_candidates_json = pipe.load_json('out.json', 'gen_candidates')
     gen_candidates_params = pipe.load_json('params.json', 'gen_candidates')
     considered_patients = pipe.patients if all_patients else pipe.patients_by_split['va']
     single_patient = pipe.patients[0] if pipe.n_patients == 1 else None
+    get_global_rank(sort_candidates_by)
     if max_n_candidates > 0:
         gen_candidates_eval_json = evaluate(max_n_candidates, sort_candidates_by=sort_candidates_by, 
                                             max_dist_fraction=max_dist_fraction, single_patient=single_patient, priority_threshold=priority_threshold)
@@ -93,6 +95,26 @@ def run(max_n_candidates=20, max_dist_fraction=0.5, priority_threshold=3,
             plt.xlim([0, 30])
             plt.legend()
             plt.savefig(filename.replace('.json', '.png'))
+
+
+def get_global_rank(sort_candidates_by):
+    patient_json = pipe.load_json('out.json', 'gen_candidates')
+    scores = []
+    labels = []
+    for patient_cnt, patient in enumerate(considered_patients):
+        single_pat = patient_json[patient]
+        for clu in single_pat['clusters']:
+            nodule_rank = clu[sort_candidates_by]
+            nodule_priority = clu['nodule_priority']
+            scores.append(nodule_rank)
+            labels.append(nodule_priority)
+    sorted_rank_true_positives = [x for (y,x) in sorted(zip(scores,labels), key = lambda pair: pair[0], reverse = True)]
+    sorted_rank_true_positives = np.nonzero(sorted_rank_true_positives)
+    ranks = [rank-i for i, rank in enumerate(sorted_rank_true_positives)]    
+    #final loss values
+    rank_score = np.mean(ranks)
+    print("Final Sorting Score with Key: ", sort_candidates_by, "| FINAL AVG RANK: ", rank_score)
+    
 
 def evaluate(max_n_candidates, sort_candidates_by='prob_sum_cluster', 
              max_dist_fraction=0.5, single_patient=None, priority_threshold=4):

@@ -46,7 +46,7 @@ def run(max_n_candidates=20, max_dist_fraction=0.5, priority_threshold=3,
     gen_candidates_params = pipe.load_json('params.json', 'gen_candidates')
     considered_patients = pipe.patients if all_patients else pipe.patients_by_split['va']
     single_patient = pipe.patients[0] if pipe.n_patients == 1 else None
-    get_global_rank(sort_candidates_by)
+    global_score = get_global_rank(sort_candidates_by)
     if max_n_candidates > 0:
         gen_candidates_eval_json = evaluate(max_n_candidates, sort_candidates_by=sort_candidates_by, 
                                             max_dist_fraction=max_dist_fraction, single_patient=single_patient, priority_threshold=priority_threshold)
@@ -65,6 +65,7 @@ def run(max_n_candidates=20, max_dist_fraction=0.5, priority_threshold=3,
         pipe.log.debug('avg_n_redundant_candidates_per_patient %s', gen_candidates_eval_json['avg_n_redundant_candidates_per_patient'])
         pipe.log.debug('avg_deviation_from_optimal_rank %s', gen_candidates_eval_json['avg_deviation_from_optimal_rank'])
         pipe.log.debug('deviation_from_optimal_rank %s', gen_candidates_eval_json['deviation_from_optimal_rank'])
+        pipe.log.debug('global_rank_score %s', global_score)
         gen_candidates_eval_json['deviation_from_optimal_rank'] = [1, 2]
         pipe.save_json('eval.json', gen_candidates_eval_json)
     else:
@@ -114,7 +115,7 @@ def get_global_rank(sort_candidates_by):
     #final loss values
     rank_score = np.mean(ranks)
     print("Final Sorting Score with Key: ", sort_candidates_by, "| FINAL AVG RANK: ", rank_score)
-    
+    return rank_score    
 
 def evaluate(max_n_candidates, sort_candidates_by='prob_sum_cluster', 
              max_dist_fraction=0.5, single_patient=None, priority_threshold=4):

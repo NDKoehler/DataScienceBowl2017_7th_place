@@ -46,7 +46,7 @@ def run(max_n_candidates=20, max_dist_fraction=0.5, priority_threshold=3,
     gen_candidates_params = pipe.load_json('params.json', 'gen_candidates')
     considered_patients = pipe.patients if all_patients else pipe.patients_by_split['va']
     single_patient = pipe.patients[0] if pipe.n_patients == 1 else None
-    global_score = get_global_rank(sort_candidates_by)
+    global_score = get_global_rank(sort_candidates_by, gen_candidates_json )
     if max_n_candidates > 0:
         gen_candidates_eval_json = evaluate(max_n_candidates, sort_candidates_by=sort_candidates_by, 
                                             max_dist_fraction=max_dist_fraction, single_patient=single_patient, priority_threshold=priority_threshold)
@@ -98,8 +98,7 @@ def run(max_n_candidates=20, max_dist_fraction=0.5, priority_threshold=3,
             plt.savefig(filename.replace('.json', '.png'))
 
 
-def get_global_rank(sort_candidates_by):
-    patient_json = pipe.load_json('out.json', 'gen_candidates')
+def get_global_rank(sort_candidates_by, patient_json):
     scores = []
     labels = []
     for patient_cnt, patient in enumerate(considered_patients):

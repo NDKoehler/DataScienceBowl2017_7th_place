@@ -15,7 +15,7 @@ pipe = OrderedDict([
     ('write_basedir', '/home/alex_wolf/storage/dsb3/alex_170323/'),
 # data splits
     ('random_seed', 17),
-    ('tr_va_ho_split', [0.2, 0.8, 0]), # something like 0.15, 0.7, 0.15
+    ('tr_va_ho_split', [0.8, 0.2, 0]), # something like 0.15, 0.7, 0.15
 # technical parameters
     ('n_CPUs', 10),
     ('GPU_ids', [0]),

@@ -111,8 +111,11 @@ def gen_data(lst_type,
                                                              HU_tissue_range) for line_num in junk)
         for junk_result in junk_lst:
             patient, patient_label, images, prob_maps = junk_result
-            images = np.array(images, dtype=np.int16)
-            prob_maps = np.array(prob_maps, dtype=np.uint8)
+            # take n_candidates or less
+            images = np.array(images, dtype=np.int16)[:n_candidates]
+            prob_maps = np.array(prob_maps, dtype=np.uint8)[:n_candidates]
+            # get num real (not filled) candidates
+            num_real_candidates = images.shape[0]
             # fill in zeros if there are less than n_candidates in the array
             if images.shape[0] < n_candidates:
                 images = np.vstack((images, np.zeros([n_candidates - images.shape[0]] + list(images.shape[1:]), dtype='int16')))
@@ -128,7 +131,7 @@ def gen_data(lst_type,
                 f.write('{}\t{}\t{}\n'.format(patient, patient_label, path))
             if pipe.dataset_name == 'LUNA16':
                 with open(pipe.get_step_dir() + lst_type + '_candidates.lst', 'a') as f:
-                    for cnt in range(len(images)):
+                    for cnt in range(num_real_candidates):
                         cand = img_lst_candidates[0][cand_line_num]
                         cand_label = img_lst_candidates[1][cand_line_num]
                         if not cand.startswith(patient):

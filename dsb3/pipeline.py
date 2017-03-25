@@ -316,8 +316,8 @@ def _init_patients_by_split(tr_va_ho_split, tr_va_ho_split_file=None):
         raise ValueError('tr_va_ho_split has to sum to one!')
     global patients_by_split
     filename = get_write_dir() + 'patients_by_split.json'
-    if False: #os.path.exists(filename):
-        patients_splits = json.load(open(filename), object_pairs_hook=OrderedDict)
+    if os.path.exists(filename):
+        patients_by_split = json.load(open(filename), object_pairs_hook=OrderedDict)
         print('reading split from', filename)
     else:
         patients_by_label_split = {}

@@ -186,10 +186,10 @@ def make_nodule(patient, nodule_annotations,
     draw_ellipses_in_layers(nodule_annotations, new_mask_array_zyx_shell, affected_layers, z_min_px, z_max_px, bound_box_offset_zyx_px, real_spacing_zyx, origin_zyx, thickness, nodule_priority_uint8, factor=1)
     # draw reduced mask
     if not ellipse_mode:
-        bbox_px_shell_zyx = get_bounding_box(new_mask_array_zyx_shell)
-        bbox_px_center_zyx = get_bounding_box(new_mask_array_zyx_shell) # If we do not fit ellipsoids, take the shell annotation also for the center.
         # draw the nodule center by dividing radii by 2
-        draw_ellipses_in_layers(nodule_annotations, new_mask_array_zyx_center, affected_layers, z_min_px, z_max_px, bound_box_offset_zyx_px, real_spacing_zyx, origin_zyx, thickness, nodule_priority_uint8, factor=0.5)
+        draw_ellipses_in_layers(nodule_annotations, new_mask_array_zyx_center, affected_layers, z_min_px, z_max_px, bound_box_offset_zyx_px, real_spacing_zyx, origin_zyx, thickness, nodule_priority_uint8, factor=params.gen_nodule_masks['reduced_mask_radius_fraction'])
+        bbox_px_shell_zyx = get_bounding_box(new_mask_array_zyx_shell)
+        bbox_px_center_zyx = get_bounding_box(new_mask_array_zyx_center)
     # draw ellipsoid and get bounding boxes
     else:
         result = fit_ellipsoid(new_mask_array_zyx_shell, nodule_priority_uint8, v_center_zyx_px, v_diam_zyx_px)

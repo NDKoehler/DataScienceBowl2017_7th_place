@@ -7,14 +7,15 @@ from collections import OrderedDict
 pipe = OrderedDict([
     ('n_patients', 0), # number of patients to process, 0 means all
 # dataset origin and paths
-    ('dataset_name', 'LUNA16'), # 'LUNA16' or 'dsb3'
+    ('dataset_name', 'dsb3'), # 'LUNA16' or 'dsb3'
     ('raw_data_dirs', {
         'LUNA16': '/media/juler/qnap/DATA/LUNA16/0_raw_data/',
-        'dsb3': '/media/juler/qnap/DATA/dsb3/stage1/',
+        #'dsb3': '/media/juler/qnap/DATA/dsb3/stage1/',
+        'dsb3': '/',
     }),
-    ('write_basedir', '/media/juler/qnap/PROJECTS/dsb3/data_pipeline/'),
+    #('write_basedir', '/media/juler/qnap/PROJECTS/dsb3/data_pipeline_gen2/'),
     #('write_basedir', '/home/juler/Projects/dsb3a/test_LUNA16/'),
-    #('write_basedir', '/home/juler/Projects/dsb3a/test_dsb3/'),
+    ('write_basedir', '/home/juler/Projects/dsb3a/test_dsb3/'),
 # data splits
     ('random_seed', 17),
                        # tr  va   ho
@@ -52,12 +53,14 @@ gen_prob_maps = OrderedDict([
     ('data_type', 'uint8'), # uint8, int16 or float32
     ('image_shape_max_ratio', 0.95),
     ('checkpoint_dir', './checkpoints/gen_prob_maps/nodule_seg_1mm_96x96_1Channel_logloss/'),
+    ('all_patients', True),
 ])
 
 gen_candidates = OrderedDict([
     ('n_candidates', 20),
     ('threshold_prob_map', 0.2),
     ('cube_shape', (32, 32, 32)), # ensure cube_edges are dividable by two -> improvement possible
+    ('all_patients', True),
 ])
 
 interpolate_candidates = OrderedDict([
@@ -71,15 +74,16 @@ interpolate_candidates = OrderedDict([
 filter_candidates = OrderedDict([
     ('n_candidates', 20),
     ('checkpoint_dir', './checkpoints/filter_candidates/rank_cross3/'),
-    ('num_augs_per_img', 1),
+    ('num_augs_per_img', 3),
     ('batch_size', 1), 
+    ('all_patients', True),
 ])
 
 gen_submission = OrderedDict([
-    ('candidates_for_submission_dir', False), # False or None -> filtered_candidates
-    ('splitting', 'submission'), # 'validation' or 'submission' or 'holdout'
-    ('checkpoint_dir', './checkpoints/test'),
-    ('num_augs_per_img', 15), # 1==NOT augmented!!! batch_size is equal ti num_augmented_data but max 64
+    ('candidates_for_submission_folder', False), # False or None -> filtered_candidates
+    ('splitting', 'validation'), # 'validation' or 'submission' or 'holdout'
+    ('checkpoint_dir', './checkpoints/gen_submission/cross_crop_retrain_further'),
+    ('num_augs_per_img', 5), # 1==NOT augmented!!! batch_size is equal ti num_augmented_data but max 64
     ('submission_lst_path', '../dsb3a_assets/dsb3/stage1_sample_submission.csv'),
 
 ])

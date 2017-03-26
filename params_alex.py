@@ -12,13 +12,13 @@ pipe = OrderedDict([
         'LUNA16': '/home/alex_wolf/storage/dsb3/data_raw/LUNA16/',
         'dsb3': '/home/alex_wolf/storage/dsb3/data_raw/dsb3/stage1/',
     }),
-    ('write_basedir', '/home/alex_wolf/storage/dsb3/alex_170323/'),
+    ('write_basedir', '/home/alex_wolf/storage/dsb3/alex_170326_test'),
 # data splits
     ('random_seed', 17),
     ('tr_va_ho_split', [0.8, 0.2, 0]), # something like 0.15, 0.7, 0.15
 # technical parameters
-    ('n_CPUs', 10),
-    ('GPU_ids', [0]),
+    ('n_CPUs', 5),
+    ('GPU_ids', [2]),
     ('GPU_memory_fraction', 0.85),
 ])
 
@@ -38,7 +38,7 @@ resample_lungs = OrderedDict([
 
 gen_prob_maps = OrderedDict([
     # the following two parameters are critical for computation time and can be easily changed
-    ('view_planes', 'z'), # a string consisting of 'y', 'x', 'z'
+    ('view_planes', 'zyx'), # a string consisting of 'y', 'x', 'z'
     ('view_angles', [0]), # per view_plane in degrees, for example, [0, 45, -45]
     # more technical parameters
     # valid shape numbers: 256, 304, 320, 352, 384, 400, 416, 448, 464, 480, 496, 512 (dividable by 16)
@@ -54,10 +54,11 @@ gen_candidates = OrderedDict([
     ('n_candidates', 20),
     ('threshold_prob_map', 0.2),
     ('cube_shape', (48, 48, 48)), # ensure cube_edges are dividable by two -> improvement possible
+    ('all_patients', True),
 ])
 
 interpolate_candidates = OrderedDict([
-    ('n_candidates', 10),
+    ('n_candidates', 20),
     ('new_spacing_zyx', [0.5, 0.5, 0.5]), # y, x, z
     ('new_data_type', 'float32'),
     ('new_candidates_shape_zyx', [96, 96, 96]),
@@ -115,8 +116,8 @@ gen_nodule_seg = OrderedDict([
 gen_candidates_eval = OrderedDict([
     ('max_n_candidates', 20),
     ('max_dist_fraction', 0.5),
-    ('priority_threshold', 3), 
-    ('sort_candidates_by', 'prob_sum_min_nodule_size'),
+    ('priority_threshold', 1), 
+    ('sort_candidates_by', None), #'prob_sum_min_nodule_size'),
     ('all_patients', True)
 ])
 

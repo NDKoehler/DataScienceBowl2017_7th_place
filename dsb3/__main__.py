@@ -44,7 +44,11 @@ def main():
     aa('-n', '--n_patients', type=int, default=None, metavar='n',
        help='Choose the number of patients to process to test the pipeline (default: read from params file).')
     aa('--patient', type=str, default=None,
-       help='provide patient id')
+       help='provide id of a single patient')
+    aa('--fromto', type=str, default=None, nargs=2,
+       help='provide range of patients, e.g. "0 400" to compute patients [0, 1, ..., 400], i.e., including 400')
+    aa('--merge', action='store_const', default=False, const=True,
+       help='merge step directories produced with "--fromto"')
     aa('-ds', '--dataset_name', type=str, default=None, metavar='d',
        help='Choose dataset_name "dsb3" (default: read from params file).')
     aa('--gpu', type=str, default=None, metavar='gpu',
@@ -77,15 +81,39 @@ def main():
     if args.gpu is not None:
         GPU_id = args.gpu
         params.pipe['GPU_ids'] = [int(GPU_id)]
+    fromto_patients = None
+    if args.fromto is not None:
+        fromto_patients = [int(i) for i in args.fromto]
     # --------------------------------------------------------------------------
     # init pipeline
-    init_pipeline(args.run, args.descr, **params.pipe)
-    # reinit the patient iterator list in pipe
-    if args.patient is not None:
-        pipe.patients = [args.patient]
+    init_pipeline(args.run, args.descr, args.patient, fromto_patients, **params.pipe)
     # now we can import `pipeline` from anywhere and use its attributes
     # --> plays the role of a class with only a single instance across the module
     for step_name in step_names:
+        if args.merge:
+            pipe._init_step(step_name)
+            from glob import glob
+            dirs_to_merge = glob(pipe.get_step_dir().rstrip('/') + '_fromto*')
+            new_dir = pipe.get_step_dir()
+            print('merging', dirs_to_merge, 'to', new_dir)
+            out = OrderedDict()
+            log = ''
+            params_save = OrderedDict()
+            for d in dirs_to_merge:
+                pipe.__step_dir_suffix = '_' + d.split('_')[-1]
+                out.update(pipe.load_json('out.json'))
+                params_save.update(pipe.load_json('params.json'))
+                with open(pipe.get_step_dir() + '/log.txt') as f:
+                    log += f.read()
+                os.system('mv ' + pipe.get_step_dir() + '/arrays/* ' + new_dir + '/arrays/')
+                os.system('rm -r ' + pipe.get_step_dir())
+            # reset suffix
+            pipe.__step_dir_suffix = ''
+            pipe.save_json('out.json', out)
+            pipe.save_json('params.json', params_save)
+            with open(pipe.get_step_dir() + '/log.txt', 'w') as f:
+                f.write(log)
+            sys.exit(0)
         pipe._run_step(step_name, getattr(params, step_name))
         #pipe._visualize_step(step_name)
 

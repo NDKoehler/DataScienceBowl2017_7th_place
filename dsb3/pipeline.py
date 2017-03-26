@@ -91,6 +91,9 @@ __step_name = None
 __step = None
 """Key characterizing the current step ."""
 
+__step_dir_suffix = ''
+"""Appended to step directory to be able to run different sets of patients. """
+
 __run = 0
 """Integer that identifies the current run of the pipeline."""
 
@@ -117,7 +120,7 @@ def get_step_dir(step_name=None, run=None):
     """Output directory where all processed data of a specifc step in a specific run is written.
     Is subdirectory of `write_dir`."""
     step_name = __step_name if step_name is None else step_name
-    return get_write_dir(run) + step_name + '/'
+    return get_write_dir(run) + step_name + __step_dir_suffix + '/'
 
 def save_json(basename, dictionary, step_name=None, mode='w'):
     filename = get_step_dir(step_name) + basename
@@ -196,6 +199,7 @@ def _init_step(step_name, mode='w'):
     __step_name = step_name
     # create step directories, log files etc.
     step_dir = get_step_dir()
+    print(step_dir)
     # data directory of step
     utils.ensure_dir(step_dir + 'arrays/')
     utils.ensure_dir(step_dir + 'figs/')
@@ -243,8 +247,7 @@ def _visualize_step(step_name=None):
         return True
     return False
 
-def _init_patients():
-    from collections import OrderedDict
+def _init_patients(_n_patients=0, single_patient_id=None, fromto_patients=None):
     filename = get_write_dir() + 'patients_raw_data_paths.json'
     global patients_raw_data_paths
     global patients
@@ -266,13 +269,19 @@ def _init_patients():
         patients_raw_data_paths = OrderedDict(zip(patients, patient_paths))
         utils.ensure_dir(filename)
         json.dump(patients_raw_data_paths, open(filename, 'w'), indent=4)
+    global __step_dir_suffix
+    __step_dir_suffix = ''
+    if _n_patients > 0:
+        patients = patients[:_n_patients]
+    elif single_patient_id is not None:
+        patients = [single_patient_id]
+    elif fromto_patients is not None:
+        print('restricted to patients', fromto_patients, 'including', fromto_patients[-1])
+        patients = patients[fromto_patients[0]:fromto_patients[-1]+1]
+        __step_dir_suffix = '_fromto-' + str(fromto_patients[0]) + '-' + str(fromto_patients[1])
     global n_patients
-    if n_patients > 0:
-        patients = patients[:n_patients]
-        patients_raw_data_paths = OrderedDict(list(patients_raw_data_paths.items())[:n_patients])
-    else:
-        n_patients = len(patients)
-    print('with', n_patients, 'patient' + ('s' if n_patients > 1 else ''))
+    n_patients = len(patients)
+    print('considering', n_patients, 'patient' + ('s' if n_patients > 1 else ''))
 
 def _init_patients_by_label():
     global patients_by_label

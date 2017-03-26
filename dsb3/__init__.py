@@ -5,10 +5,12 @@ from . import utils
 
 def init_pipeline(run,
                   run_descr,
+                  single_patient_id,
+                  fromto_patients,
+                  n_patients,
                   dataset_name,
                   raw_data_dirs,
                   write_basedir,
-                  n_patients=0,
                   tr_va_ho_split=None,
                   random_seed=17,
                   n_CPUs=1,
@@ -28,7 +30,6 @@ def init_pipeline(run,
     # create base directory
     pipe.write_basedir = write_basedir.rstrip('/') + '/'
     utils.ensure_dir(pipe.get_write_dir())
-    pipe.n_patients = n_patients
     # init the current run of the pipeline
     pipe._init_run(run, run_descr)
     # logger for the whole pipeline, to be invoked by `pipe.log.info(...)`
@@ -36,7 +37,7 @@ def init_pipeline(run,
     # set seed
     np.random.seed(random_seed)
     # locate input data files and init patient lists
-    pipe._init_patients()
+    pipe._init_patients(n_patients, single_patient_id, fromto_patients)
     if pipe._init_patients_by_label():
         pipe._init_patients_by_split(tr_va_ho_split)
     # technical parameters

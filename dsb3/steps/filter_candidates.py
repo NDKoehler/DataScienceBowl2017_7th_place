@@ -11,7 +11,11 @@ from .. import pipeline as pipe
 from .. import utils
 from .. import tf_tools
 
-def run(num_augs_per_img, checkpoint_dir, batch_size, n_candidates):
+def run(num_augs_per_img,
+        checkpoint_dir,
+        batch_size,
+        n_candidates,
+        all_patients):
     # load some information json
     gen_candidates_json = pipe.load_json('out.json', 'gen_candidates')
     out_json = OrderedDict()
@@ -24,7 +28,11 @@ def run(num_augs_per_img, checkpoint_dir, batch_size, n_candidates):
     # generate nodule_score_session
     gen_nodule_score = score_nodules(num_augs_per_img, net_config, pipe.dataset_name )
     # loop over lsts
-    for lst_type in ['tr', 'va', 'ho']:
+    if all_patients:
+        splits = ['tr', 'va', 'ho']
+    else:
+        splits = ['va']
+    for lst_type in splits:
         patients_DF_path = pipe.get_step_dir('interpolate_candidates') + lst_type + '_patients.lst'
         if os.path.exists(patients_DF_path):
             patients_DF = pd.read_csv(patients_DF_path, sep = '\t', header=None)

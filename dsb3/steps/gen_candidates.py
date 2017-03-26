@@ -14,13 +14,15 @@ sort_clusters_by = 'prob_sum_min_nodule_size'
 
 def run(n_candidates,
         threshold_prob_map,
-        cube_shape):
+        cube_shape,
+        all_patients):
     resample_lungs_json = pipe.load_json('out.json', 'resample_lungs')
     gen_prob_maps_json = pipe.load_json('out.json', 'gen_prob_maps')
     gen_nodule_masks_json = None
+    considered_patients = pipe.patients if all_patients else pipe.patients_by_split['va']
     if pipe.dataset_name == 'LUNA16':
         gen_nodule_masks_json = pipe.load_json('out.json', 'gen_nodule_masks')
-    patients_candidates_json = OrderedDict(Parallel(n_jobs=min(pipe.n_CPUs, len(pipe.patients)), verbose=100)(
+    patients_candidates_json = OrderedDict(Parallel(n_jobs=min(pipe.n_CPUs, len(considered_patients)), verbose=100)(
                                            delayed(process_patient)(patient,
                                                                     n_candidates,
                                                                     threshold_prob_map,
@@ -28,7 +30,7 @@ def run(n_candidates,
                                                                     resample_lungs_json, 
                                                                     gen_prob_maps_json,
                                                                     gen_nodule_masks_json)
-                                           for patient in pipe.patients))
+                                           for patient in considered_patients))
     # write both patients and candidates list
     patients_lst_path = pipe.get_step_dir() + 'patients.lst'
     patients_lst = open(patients_lst_path, 'w')
@@ -36,7 +38,7 @@ def run(n_candidates,
     if 1:
         candidates_lst_path = pipe.get_step_dir() + 'candidates.lst'
         candidates_lst = open(candidates_lst_path, 'w')
-    for patient_cnt, patient in enumerate(tqdm(pipe.patients)):
+    for patient_cnt, patient in enumerate(tqdm(considered_patients)):
         patients_lst.write(patients_candidates_json[patient]['patients_lst'])
         del patients_candidates_json[patient]['patients_lst']
         # if pipe.dataset_name == 'LUNA16':

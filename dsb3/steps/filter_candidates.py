@@ -52,6 +52,7 @@ def run(num_augs_per_img,
         # initialize out_list
         open(pipe.get_step_dir() + lst_type + '_candidates_filtered.lst', 'w').close()
         # get scores for all candidates of each patient
+        all_patient_losses = []
         for pa_cnt, patient in enumerate(tqdm(patients_DF[0].values.tolist())):
             # read and write jsons
             patient_json = gen_candidates_json[patient]
@@ -74,9 +75,11 @@ def run(num_augs_per_img,
                 if pipe.dataset_name == 'LUNA16':
                     lab     = float(clusters_json[cand_cnt]['nodule_priority'])
                     score, logloss = gen_nodule_score.predict_score(candidate, lab)
+                    all_patient_losses.append(logloss)
                 else:
                     score = gen_nodule_score.predict_score(candidate)
                 all_candidates_scores.append(score)
+                print(np.mean(all_patient_losses))
             # extract candidates with highest scores
             out_candidates_idx = list(np.argsort(np.array(all_candidates_scores)).copy()[::-1])
             out_candidates_idx = out_candidates_idx[:n_candidates]
@@ -132,7 +135,7 @@ class score_nodules():
         # get List_iterator for augmentation
         sys.path.append(self.checkpoint_dir)
         from io_modules.list_iterator_classification import List_Iterator
-        self.pred_iter = List_Iterator(self.config, img_lst=False, img_shape=self.image_shape, label_shape=self.label_shape, batch_size=self.batch_size, shuffle=False, is_training=False if self.num_augs_per_img==1 else True)
+        self.pred_iter = List_Iterator(self.config, img_lst=False, img_shape=self.image_shape, label_shape=self.label_shape, batch_size=self.batch_size, shuffle=False, is_training=(not (self.num_augs_per_img==1)))
 
     def logloss(self, prediction, label):
         eps = 1e-6
@@ -151,6 +154,7 @@ class score_nodules():
         ATTENTION:
             num_augs_per_img == 1 means that first prediction is not augmented!
         '''
+
         # clean batch
         self.batch[:] = -0.25
         self.cand_predictions[:] = 0.0

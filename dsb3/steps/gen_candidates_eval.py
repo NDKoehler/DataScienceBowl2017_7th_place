@@ -108,7 +108,7 @@ def get_global_rank(sort_candidates_by, patient_json):
         single_pat = patient_json[patient]
         for clu in single_pat['clusters']:
             nodule_rank = float(clu[sort_candidates_by])
-            nodule_rank = 0 if nodule_rank<0 else nodule_rank
+            #nodule_rank = 0 if nodule_rank<0 else nodule_rank
             nodule_priority = clu['nodule_priority']
             scores.append(nodule_rank)
             labels.append(nodule_priority)

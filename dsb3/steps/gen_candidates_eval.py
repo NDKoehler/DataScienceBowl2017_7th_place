@@ -43,13 +43,13 @@ def run(max_n_candidates=20, max_dist_fraction=0.5, priority_threshold=3,
     global gen_nodule_masks_json, gen_candidates_json, gen_candidates_params, considered_patients
     gen_nodule_masks_json = pipe.load_json('out.json', 'gen_nodule_masks')
     gen_candidates_params = pipe.load_json('params.json', 'gen_candidates')
-    if sort_candidates_by=='nodule_score':
+    if sort_candidates_by == 'nodule_score':
         gen_candidates_json = pipe.load_json('out.json', 'filter_candidates')
     else:
         gen_candidates_json = pipe.load_json('out.json', 'gen_candidates')
     considered_patients = pipe.patients if all_patients else pipe.patients_by_split['va']
     single_patient = pipe.patients[0] if pipe.n_patients == 1 else None
-    global_score = get_global_rank(sort_candidates_by, gen_candidates_json )
+    global_score = get_global_rank(sort_candidates_by, gen_candidates_json)
     if max_n_candidates > 0:
         gen_candidates_eval_json = evaluate(max_n_candidates, sort_candidates_by=sort_candidates_by, 
                                             max_dist_fraction=max_dist_fraction, single_patient=single_patient, priority_threshold=priority_threshold)
@@ -171,10 +171,10 @@ def evaluate(max_n_candidates, sort_candidates_by='prob_sum_cluster',
                 nodules_indices.append(nodule_idx)
                 nodule_center = nodule['center_zyx_px']
                 for ican, candidate in enumerate(candidates[:max_n_candidates]):
-                    # print ('candidate center_px', candidate['center_px'])
                     can_center = candidate['center_px']
                     nodules_in_candidates[-1].append(gen_candidates.is_contained(can_center, nodule_center, can_cube_shape, max_dist_fraction))
             if n_nodules_ == 0:
+                # no nodules at this priority
                 n_fp_ = min(n_candidates, max_n_candidates)
                 continue
             nodules_in_candidates = np.array(nodules_in_candidates)

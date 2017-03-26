@@ -102,7 +102,7 @@ def process_patient(patient,
         # set cancer labels
         patient_json['label'] = pipe.patients_label[patient]
     else:
-        # set nodule labels
+        # set nodule labels for candidates
         gen_nodule_masks_json_patient = gen_nodule_masks_json[patient]
         count_nodules_prio_greater_2 = 0
         for clu in clusters:
@@ -117,6 +117,19 @@ def process_patient(patient,
                         if clu['nodule_priority'] > 2:
                             count_nodules_prio_greater_2 += 1
                             break
+        # generate a list of the non-detected nodules
+        non_detected_nodules = []
+        if gen_nodule_masks_json_patient['nodule_patient']:
+            nodules = gen_nodule_masks_json_patient['nodules']
+            for nodule_cnt, nodule in enumerate(nodules):
+                nodule_center = nodule['center_zyx_px']
+                nodule_is_contained = False
+                for clu in clusters:
+                    can_center = clu['center_px']
+                    if is_contained(can_center, nodule_center, cube_shape):
+                        nodule_is_contained = True
+                if not nodule_is_contained:
+                    non_detected_nodules.append(nodule_cnt)                
         patient_json['label'] = count_nodules_prio_greater_2 > 0
     patient_json['clusters'] = [] # this stores all the information about the candidates
     patient_json['candidates_lst'] = [] # this is a sorted list of candidates
@@ -125,18 +138,18 @@ def process_patient(patient,
         patient_json['clusters'].append(OrderedDict())
         cluster_json = patient_json['clusters'][cluster_cnt]
         # save candidate from img_array
-        cluster_json['img_basename'] = basename = patient + '_{:02}_img.npy'.format(cluster_cnt)
-        cluster_json['img_path'] = pipe.save_array(basename, clu['img_array'].astype(np.float32))
+        cluster_json['img_basename'] = basename_img = patient + '_{:02}_img.npy'.format(cluster_cnt)
+        cluster_json['img_path'] = pipe.save_array(basename_img, clu['img_array'].astype(np.float32))
         can_img_paths.append(cluster_json['img_path'])
         # save candidate from prob_map
-        basename = patient + '_{:02}_prob_map.npy'.format(cluster_cnt)
-        cluster_json['prob_map_basename'] = basename
-        cluster_json['prob_map_path'] = pipe.save_array(basename, clu['prob_map_array'].astype(np.float32))
+        cluster_json['prob_map_basename'] = basename_prob_map = patient + '_{:02}_prob_map.npy'.format(cluster_cnt)
+        cluster_json['prob_map_path'] = pipe.save_array(basename_prob_map, clu['prob_map_array'].astype(np.uint8))
         can_prob_map_paths.append(cluster_json['prob_map_path'])
         # check cluster_shape
         if clu['prob_map_array'].shape != tuple(cube_shape):
             raise ValueError('Wrong shape {} for patient  {}'.format(clu['prob_map_array'].shape, patient))
         # save some cluster info
+        cluster_json['is_non_detect'] = 0
         cluster_json['prob_max_cluster'] = int(clu['prob_max_cluster'])  # is all in units of 255
         cluster_json['prob_sum_cluster'] = int(clu['prob_sum_cluster'])
         cluster_json['prob_sum_min_nodule_size'] = int(clu['prob_sum_min_nodule_size'])
@@ -145,9 +158,33 @@ def process_patient(patient,
         cluster_json['box_coords_px'] = clu['box_coords_px']
         # candidate classification info
         if pipe.dataset_name == 'LUNA16':
-            cluster_json['nodule_priority'] = clu['nodule_priority']
-            patient_json['candidates_lst'].append('{}_{}\t{}\t{}\t{}\n'.format(patient, cluster_cnt, 
-                                                                               clu['nodule_priority'], cluster_json['img_path'], cluster_json['prob_map_path']))
+            cluster_json['nodule_priority'] = nodule_priority = clu['nodule_priority']
+            is_non_detect = 0
+            # account for non-detects only in list
+            if cluster_cnt >= len(clusters) - len(non_detected_nodules):
+                non_detect_cnt = non_detected_nodules[len(clusters) - cluster_cnt - 1]
+                is_non_detect = 1
+                cluster_json['is_non_detect'] = 1
+                # overwrite the cluster info
+                cluster_json['prob_max_cluster'] = 0
+                cluster_json['prob_sum_cluster'] = 0
+                cluster_json['prob_sum_min_nodule_size'] = 0
+                cluster_json['size_points_cluster'] = 0
+                cluster_json['center_px'] = [0, 0, 0]
+                cluster_json['box_coords_px'] = [0, 0, 0, 0, 0, 0]
+                cluster_json['nodule_priority'] = 0
+                nodule_priority = nodules[non_detect_cnt]['nodule_priority']
+                # overwrite the former candidate
+                nodule_box = get_cluster_box_coords(nodules[non_detect_cnt]['center_zyx_px'], cube_shape)
+                img_array_non_detect = utils.crop_and_embed(img_array, nodule_box, cube_shape)
+                pipe.save_array(basename_img, img_array.astype(np.float32))
+                prob_map_array_non_detect = utils.crop_and_embed(prob_map, nodule_box, cube_shape)
+                pipe.save_array(basename_prob_map, prob_map_array_non_detect.astype(np.uint8))
+            patient_json['candidates_lst'].append('{}_{}\t{}\t{}\t{}\t{}\n'.format(patient, cluster_cnt,
+                                                                                   nodule_priority,
+                                                                                   cluster_json['img_path'],
+                                                                                   cluster_json['prob_map_path'],
+                                                                                   is_non_detect))
         elif pipe.dataset_name == 'dsb3':
             patient_json['candidates_lst'].append('{}_{}\t{}\t{}\t{}\n'.format(patient, cluster_cnt, 
                                                                                patient_json['label'], cluster_json['img_path'], cluster_json['prob_map_path']))
@@ -159,14 +196,16 @@ def process_patient(patient,
 
 def get_clusters_box_coords(clusters, cube_shape):
     for cluster in clusters:
-        cluster_center = cluster['center_px']
-        box_coords = []
-        for coord in range(3):
-            start = int(cluster_center[coord] - cube_shape[coord]/2)
-            box_coords += [start]
-            box_coords += [start + cube_shape[coord]]
-        cluster['box_coords_px'] = box_coords
+        cluster['box_coords_px'] = get_cluster_box_coords(cluster['center_px'], cube_shape)
     return clusters
+
+def get_cluster_box_coords(cluster_center, cube_shape):
+    box_coords = []
+    for coord in range(3):
+        start = int(cluster_center[coord] - cube_shape[coord]/2)
+        box_coords += [start]
+        box_coords += [start + cube_shape[coord]]
+    return box_coords
 
 def get_clusters_array(clusters, cube_shape, array, array_name):
     for cluster in clusters:

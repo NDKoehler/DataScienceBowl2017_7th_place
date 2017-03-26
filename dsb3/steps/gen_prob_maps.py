@@ -12,7 +12,8 @@ def run(data_type,
         image_shapes,
         image_shape_max_ratio,
         view_planes,
-        view_angles):
+        view_angles,
+        all_patients):
     """
     Parameters
     ----------
@@ -33,10 +34,11 @@ def run(data_type,
     # split patients by scan_shape for the nodule_segmentation_nets with distinct image_shapes -> save computing time
     patients_per_net = [[] for n in range(len(image_shapes))]
     registered_patients = set()
+    considered_patients = pipe.patients if all_patients else pipe.patients_by_split['va']
     for net_num, net_shape in enumerate(image_shapes):
         net_shape = [net_shape[0] for i in range(3)] # need three dimensions
-        ratio = 1 if net_num == len(image_shapes) - 1 else image_shape_max_ratio # for avoiding border effects net due to padding, ...
-        for patient in pipe.patients:
+        ratio = 1 if net_num == len(image_shapes) - 1 else image_shape_max_ratio # for avoiding border effects net due to padding, ...        
+        for patient in considered_patients:
             if patient in registered_patients:
                 continue
             scan_shape_z = resample_lungs_json[patient]['resampled_scan_shape_zyx_px'][0]
@@ -48,7 +50,7 @@ def run(data_type,
             if np.all(np.array(scan_shape) < ratio * np.array(net_shape)):
                 patients_per_net[net_num].append(patient)
                 registered_patients.add(patient)
-    if len(registered_patients) != len(pipe.patients):
+    if len(registered_patients) != len(considered_patients):
         raise ValueError('Registering patients for different nets is inconsistent.')
     pipe.log.info('patients distribution on nets: ' + str([len(l) for l in patients_per_net]))
     reuse_init = True

@@ -79,14 +79,12 @@ def main():
         params.pipe['GPU_ids'] = [int(GPU_id)]
     # --------------------------------------------------------------------------
     # init pipeline
-    init_pipeline(**params.pipe)
+    init_pipeline(args.run, args.descr, **params.pipe)
     # reinit the patient iterator list in pipe
     if args.patient is not None:
         pipe.patient = [patient]
     # now we can import `pipeline` from anywhere and use its attributes
     # --> plays the role of a class with only a single instance across the module
-    # init the current run of the pipeline
-    pipe._init_run(step_names[0], args.run, args.descr)
     for step_name in step_names:
         pipe._run_step(step_name, getattr(params, step_name))
         #pipe._visualize_step(step_name)

@@ -3,7 +3,9 @@ import numpy as np
 from collections import OrderedDict
 from . import utils
 
-def init_pipeline(dataset_name,
+def init_pipeline(run,
+                  run_descr,
+                  dataset_name,
                   raw_data_dirs,
                   write_basedir,
                   n_patients=0,
@@ -27,10 +29,13 @@ def init_pipeline(dataset_name,
     pipe.write_basedir = write_basedir.rstrip('/') + '/'
     utils.ensure_dir(pipe.get_write_dir())
     pipe.n_patients = n_patients
-    # logger for the whole pipeline, to be invoked by `pipe.log.info(msg)`, for example
-    pipe._init_log()
-    # locate input data files and init patient lists
+    # init the current run of the pipeline
+    pipe._init_run(run, run_descr)
+    # logger for the whole pipeline, to be invoked by `pipe.log.info(...)`
+    pipe._init_log_pipe()
+    # set seed
     np.random.seed(random_seed)
+    # locate input data files and init patient lists
     pipe._init_patients()
     if pipe._init_patients_by_label():
         pipe._init_patients_by_split(tr_va_ho_split)

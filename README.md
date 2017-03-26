@@ -10,7 +10,7 @@ for getting help.
 
 Let us start a first `run` of the pipeline and restrict ourselves to step 0 and 1 with
 ```
-$ ./dsb3.py 0,step1
+$ ./dsb3.py 0,1
 ```
 which produces the following output
 ```

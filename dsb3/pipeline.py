@@ -117,21 +117,20 @@ def get_step_dir(step_name=None, run=None):
     step_name = __step_name if step_name is None else step_name
     return get_write_dir(run) + step_name + '/'
 
-def save_json(basename, d, step_name=None, mode='w'):
-    if mode == 'a':
-        if os.path.exists(get_step_dir(step_name) + ('out.json' if basename is None else basename)):
-            old_d = load_json(step_name)
-            old_d.update(d)
-            d = old_d
-    step_dir = get_step_dir(step_name)
-    with open(step_dir + ('out.json' if basename is None else basename), 'w') as f:
-        json.dump(d, f, indent=4, indent_to_level=1)
+def save_json(basename, dictionary, step_name=None, mode='w'):
+    filename = get_step_dir(step_name) + basename
+    if mode == 'a' and os.path.exists(filename):
+        old_d = load_json(basename, step_name)
+        old_d.update(dictionary)
+        dictionary = old_d
+    with open(filename, 'w') as f:
+        json.dump(dictionary, f, indent=4, indent_to_level=1)
 
 def load_json(basename, step_name=None):
     step_dir = _get_step_dir_for_load(step_name)
-    with open(step_dir + ('out.json' if basename is None else basename)) as f:
-        d = json.load(f, object_pairs_hook=OrderedDict)
-    return d
+    with open(step_dir + basename) as f:
+        dictionary = json.load(f, object_pairs_hook=OrderedDict)
+    return dictionary
 
 def save_array(basename, array, step_name=None):
     step_dir = get_step_dir(step_name) + 'arrays/'
@@ -157,7 +156,7 @@ def _get_step_dir_for_load(step_name=None):
             return step_dir
     raise FileNotFoundError('Did not find ' + step_dir + ' in runs ' + str(trial_runs) + '.')
 
-def _init_run(next_step_name, run=-1, descr='', init_run=-1):
+def _init_run(run=-1, run_descr='', init_run=-1):
     runs_filename = write_basedir + dataset_name + '_runs.json'    
     # case run == -1 and the step has already been run before
     global avail_runs
@@ -166,18 +165,18 @@ def _init_run(next_step_name, run=-1, descr='', init_run=-1):
         if os.path.exists(runs_filename):
             avail_runs = json.load(open(runs_filename), object_pairs_hook=OrderedDict)
             run = int(next(reversed(avail_runs)))
-            if descr != '':
+            if run_descr != '':
                 print('increasing run level to', run + 1)
                 run += 1 # increase run level by one
         else:
             run = 0
-            descr = 'run zero' if descr == '' else descr
+            run_descr = 'run zero' if run_descr == '' else run_descr
     # case run > -1: simply update avail_runs
     else:
         avail_runs = json.load(open(runs_filename), object_pairs_hook=OrderedDict)
-    if avail_runs and descr == '':
-        descr = avail_runs[str(run)][1]
-    avail_runs[str(run)] = [time.strftime('%Y-%m-%d %H:%M', time.localtime()), descr]
+    if avail_runs and run_descr == '':
+        run_descr = avail_runs[str(run)][1]
+    avail_runs[str(run)] = [time.strftime('%Y-%m-%d %H:%M', time.localtime()), run_descr]
     json.dump(avail_runs, open(runs_filename, 'w'), indent=4, indent_to_level=0)
     # update global variables
     global __run, __init_run, write_dir
@@ -336,7 +335,7 @@ def _init_patients_by_split(tr_va_ho_split, tr_va_ho_split_file=None):
             patients_by_split[split] = list(np.array(patients_by_split[split])[np.random.permutation(len(patients_by_split[split]))])
         json.dump(patients_by_split, open(filename, 'w'), indent=4)
 
-def _init_log(level=logging.DEBUG):
+def _init_log_pipe(level=logging.DEBUG):
     global log_pipe
     filename = get_write_dir()+ 'log.txt'
     if os.path.exists(filename):

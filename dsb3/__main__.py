@@ -43,8 +43,8 @@ def main():
        help='Show this help message and exit.')
     aa('-n', '--n_patients', type=int, default=None, metavar='n',
        help='Choose the number of patients to process to test the pipeline (default: read from params file).')
-    aa('patient', nargs='?', default=None,
-       help="provide patient id")
+    aa('--patient', type=str, default=None,
+       help='provide patient id')
     aa('-ds', '--dataset_name', type=str, default=None, metavar='d',
        help='Choose dataset_name "dsb3" (default: read from params file).')
     aa('--gpu', type=str, default=None, metavar='gpu',
@@ -82,7 +82,7 @@ def main():
     init_pipeline(args.run, args.descr, **params.pipe)
     # reinit the patient iterator list in pipe
     if args.patient is not None:
-        pipe.patient = [patient]
+        pipe.patients = [args.patient]
     # now we can import `pipeline` from anywhere and use its attributes
     # --> plays the role of a class with only a single instance across the module
     for step_name in step_names:

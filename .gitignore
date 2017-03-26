@@ -1,6 +1,7 @@
 # DSB3
 checkpoints/*
 dsb3/params.py
+params_niklas.py
 
 # always-ignore extensions
 *~

@@ -27,6 +27,7 @@ avail_steps = OrderedDict([
     ('4', 'interpolate_candidates'),
     ('5', 'filter_candidates'),
     ('6', 'gen_nodule_seg_data'),
+    ('7', 'gen_submission'),
 ])
 
 avail_runs = OrderedDict([])

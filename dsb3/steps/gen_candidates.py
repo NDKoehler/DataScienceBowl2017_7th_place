@@ -100,7 +100,7 @@ def process_patient(patient,
     patient_json = OrderedDict()
     if pipe.dataset_name == 'dsb3':
         # set cancer labels
-        patient_json['label'] = pipe.patients_label[patient]
+        patient_json['label'] = pipe.patients_label[patient]['cancer_label']
     else:
         # set nodule labels for candidates
         gen_nodule_masks_json_patient = gen_nodule_masks_json[patient]

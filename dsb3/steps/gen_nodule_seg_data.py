@@ -121,6 +121,9 @@ def generate_data_lsts(HU_tissue_range,
                 scan = (scan*255).astype(np.uint8)
             if mask.dtype == np.uint8:
                 mask = mask
+            else:
+                print ('ERROR')
+                sys.exit()
 
             # combine scan and mask to data
             data = np.zeros(list(scan.shape)+[3], dtype=np.uint8)

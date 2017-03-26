@@ -46,7 +46,7 @@ def run(max_n_candidates=20, max_dist_fraction=0.5, priority_threshold=3,
     if sort_candidates_by=='nodule_score':
         gen_candidates_json = pipe.load_json('out.json', 'filter_candidates')
     else:
-	gen_candidates_json = pipe.load_json('out.json', 'gen_candidates')    
+	gen_candidates_json = pipe.load_json('out.json', 'gen_candidates')
     considered_patients = pipe.patients if all_patients else pipe.patients_by_split['va']
     single_patient = pipe.patients[0] if pipe.n_patients == 1 else None
     global_score = get_global_rank(sort_candidates_by, gen_candidates_json )

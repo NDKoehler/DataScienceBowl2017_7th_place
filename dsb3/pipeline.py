@@ -26,6 +26,7 @@ avail_steps = OrderedDict([
     ('3vis', 'gen_candidates_vis'),
     ('4', 'interpolate_candidates'),
     ('5', 'filter_candidates'),
+    ('6', 'gen_nodule_seg_data'),
 ])
 
 avail_runs = OrderedDict([])
@@ -274,6 +275,7 @@ def _init_patients():
 
 def _init_patients_by_label():
     global patients_by_label
+    global patients_label
     filename = get_write_dir() + 'patients_by_label.json'
     filename2 = get_write_dir() + 'patients_label.json'
     if False: #os.path.exists(filename):
@@ -297,16 +299,17 @@ def _init_patients_by_label():
             dsb3_labels = pd.read_csv('/'.join(raw_data_dir.split('/')[:-2]) + '/stage1_labels.csv')
             try:
                 for label in [1, 0, -1]:
-                    patients_by_label[label] = dsb3_labels['id'].loc[dsb3_labels['cancer'] == label].tolist()
+                    patients_by_label[label] = dsb3_labels[dsb3_labels['cancer'] == label]['id'].values.tolist()
                 for patient in patients:
+                    patients_label[patient] = {}
                     if patient in set(dsb3_labels['id'].values.tolist()):
-                        patients_label[patient]['cancer_label'] = dsb3_labels['cancer'].loc[dsb3_labels['id'] == patient].tolist()[0]
+                        patients_label[patient]['cancer_label'] = dsb3_labels[dsb3_labels['id'] == patient]['cancer'].values.tolist()[0]
                     else:
                         patients_label[patient]['cancer_label'] = -1
                 json.dump(patients_by_label, open(filename, 'w'), indent=4)
                 json.dump(patients_label, open(filename2, 'w'), indent=4)
             except KeyError:
-                print('Deal with the KeyError here!')
+               print('Deal with the KeyError here!')
     return True
 
 

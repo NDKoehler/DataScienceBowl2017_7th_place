@@ -99,7 +99,7 @@ gen_nodule_masks = OrderedDict([
 ])
 
 gen_nodule_seg_data = OrderedDict([
-    ('view_angles', [0, 45]), # per view_plane (degree)
+    ('view_angles', [0]), # per view_plane (degree)
     ('extra_radius_buffer_px', 15),
     ('num_channels', 1),
     ('stride', 1),

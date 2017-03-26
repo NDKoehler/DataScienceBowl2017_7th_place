@@ -353,16 +353,18 @@ def generate_data_lsts(HU_tissue_range,
 
                     stacked_data[:,:,:img.shape[-1],:1]  = img.copy()
                     stacked_data[:,:,:lab.shape[-1],1:3] = lab.copy()
+                    
+                    all_data.append(stacked_data.copy())
+                    out_lst.write('{}\t{}\t{}\t{}\n'.format(num_data, patient, num_patient_data, 1 if cropped_images_lst_key=='nodules' else 0))
+                    num_data += 1
+                    num_patient_data += 1                    
+                    
                     # if 0 and cropped_images_lst_key=='nodules':
                     #     randy = np.random.randint(0,10000)
                     #     cv2.imwrite('test_imgs/'+str(randy)+'_img.jpg', stacked_data[:,:,stacked_data.shape[2]//2,0])
                     #     cv2.imwrite('test_imgs/'+str(randy)+'_lab.jpg', stacked_data[:,:,stacked_data.shape[2]//2,1])
                     #     cv2.imwrite('test_imgs/'+str(randy)+'_center.jpg', stacked_data[:,:,stacked_data.shape[2]//2,2])
-                    # all_data.append(stacked_data.copy())
 
-                    out_lst.write('{}\t{}\t{}\t{}\n'.format(num_data, patient, num_patient_data, 1 if cropped_images_lst_key=='nodules' else 0))
-                    num_data += 1
-                    num_patient_data += 1
                     # if num_data == 3000 and 1: 
                     #     out_path = pipe.save_array(basename=lst_type+'.npy' , array=np.array(all_data, dtype=np.uint8), step_name='gen_nodule_seg_data')
                     #     out_lst.close()

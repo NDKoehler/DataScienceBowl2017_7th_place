@@ -79,7 +79,6 @@ def run(num_augs_per_img,
                 else:
                     score = gen_nodule_score.predict_score(candidate)
                 all_candidates_scores.append(score)
-                print(np.mean(all_patient_losses))
             # extract candidates with highest scores
             out_candidates_idx = list(np.argsort(np.array(all_candidates_scores)).copy()[::-1])
             out_candidates_idx = out_candidates_idx[:n_candidates]

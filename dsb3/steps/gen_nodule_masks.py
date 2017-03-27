@@ -146,17 +146,17 @@ def make_nodule(patient, nodule_annotations,
                                        - bound_box_offset_zyx_px[1]).round(decimals=0).astype(int)
     nodule_annotations['coordX_px'] = ((nodule_annotations['coordX'].copy() - origin_zyx[2])/real_spacing_zyx[2]
                                         - bound_box_offset_zyx_px[2]).round(decimals=0).astype(int)
-    nodule_annotations['diameter_y_px'] = [min(va/real_spacing_zyx[1] + yx_buffer_px, upper_limit_px) for va in nodule_annotations['diameter_y_mm']]
-    nodule_annotations['diameter_x_px'] = [min(va/real_spacing_zyx[2] + yx_buffer_px, upper_limit_px) for va in nodule_annotations['diameter_x_mm']]
+    nodule_annotations['diameter_y_px'] = [min(va/real_spacing_zyx[1] + yx_buffer_px, upper_limit_px*2) for va in nodule_annotations['diameter_y_mm']]
+    nodule_annotations['diameter_x_px'] = [min(va/real_spacing_zyx[2] + yx_buffer_px, upper_limit_px*2) for va in nodule_annotations['diameter_x_mm']]
     center_anno_zyx_mm = [np.mean(nodule_annotations['coordZ']),
                           np.mean(nodule_annotations['coordY']),
                           np.mean(nodule_annotations['coordX'])]
     # no buffer
     z_min_px = int(np.ceil((nodule_annotations['z_min_mm'].iloc[0] - origin_zyx[0])/real_spacing_zyx[0]))
     z_max_px = int(np.floor((nodule_annotations['z_max_mm'].iloc[0] - origin_zyx[0])/real_spacing_zyx[0]))
-    # limit size to max 24 px
-    z_min_px = max(z_min_px + (z_max_px - z_min_px)//2 - upper_limit_px//2, z_min_px)
-    z_max_px = min(z_max_px - (z_max_px - z_min_px)//2 + upper_limit_px//2, z_max_px)
+    # limit size
+    z_min_px = max((z_max_px + z_min_px)//2 - upper_limit_px, z_min_px)
+    z_max_px = min((z_max_px + z_min_px)//2 + upper_limit_px, z_max_px)
     v_center_zyx_px = [int(round(np.mean(nodule_annotations['coordZ_px']))),
                        int(round(np.mean(nodule_annotations['coordY_px']))),
                        int(round(np.mean(nodule_annotations['coordX_px'])))]
@@ -181,7 +181,7 @@ def make_nodule(patient, nodule_annotations,
     affected_layers = list(range(start_layer, end_layer + 1))
 
     # draw full thickness if thickness == -1, otherwise restrict to thickness 2
-    small_enough = v_diam_zyx_px[0] * v_diam_zyx_px[1] * v_diam_zyx_px[2] <= 1000    
+    small_enough = v_diam_zyx_px[0] * v_diam_zyx_px[1] * v_diam_zyx_px[2] <= 1000
     thickness = -1 if (small_enough or not ellipse_mode) else 2
     draw_ellipses_in_layers(nodule_annotations, new_mask_array_zyx_shell, affected_layers, z_min_px, z_max_px, bound_box_offset_zyx_px, real_spacing_zyx, origin_zyx, thickness, nodule_priority_uint8, factor=1)
     # draw reduced mask
@@ -204,7 +204,7 @@ def draw_ellipses_in_layers(nodule_annotations, new_mask_array_zyx, affected_lay
     if factor < 1:
         z_radius = factor * (z_max_px - z_min_px) / 2
         z_mean = (z_max_px + z_min_px) / 2
-        z_radius = max(2, z_radius)
+        z_radius = max(params.gen_nodule_masks['mask2pred_lower_radius_limit_px'], z_radius)
         z_max_px = z_mean + z_radius
         z_min_px = z_mean - z_radius
     for idx, v_layer in enumerate(affected_layers):
@@ -286,10 +286,10 @@ def draw_new_ellipsoid(new_mask_shape, center, radii, rotation, v_center_px, v_d
 
 def get_bounding_box(array):
     points = np.argwhere(array > 1)
-    if len(points) > 0:        
-        bbox = [np.min(points[:, 0]), np.max(points[:, 0]) + 1,
-                np.min(points[:, 1]), np.max(points[:, 1]) + 1,
-                np.min(points[:, 2]), np.max(points[:, 2]) + 1]
+    if len(points) > 0:
+        bbox = [np.min(points[:, 0]), np.max(points[:, 0]),
+                np.min(points[:, 1]), np.max(points[:, 1]),
+                np.min(points[:, 2]), np.max(points[:, 2])]
     else:
         bbox = []
     return bbox

@@ -160,11 +160,11 @@ def make_nodule(patient, nodule_annotations,
     v_center_zyx_px = [int(round(np.mean(nodule_annotations['coordZ_px']))),
                        int(round(np.mean(nodule_annotations['coordY_px']))),
                        int(round(np.mean(nodule_annotations['coordX_px'])))]
-    # diameters at least 2 px
+    # diameters at least lower_limit_px
     v_diam_zyx_px = [np.abs(z_max_px-z_min_px),
                      np.max(nodule_annotations['diameter_y_mm']/real_spacing_zyx[1]),
                      np.max(nodule_annotations['diameter_x_mm']/real_spacing_zyx[2])]
-    v_diam_zyx_px = [max(2, v) for v in v_diam_zyx_px]
+    v_diam_zyx_px = [max(params.gen_nodule_masks['mask2pred_lower_radius_limit_px']*2, v) for v in v_diam_zyx_px]
     old_diameter_mm = np.max(nodule_annotations['diameter_mm'])
     nodule_priority = nodule_annotations['nodule_priority'].iloc[0]
     if nodule_priority >= 3:
@@ -264,7 +264,7 @@ def fit_ellipsoid(mask_array_zyx, color, v_center_px, v_diam_px):
                                                        radii_shell,
                                                        rotation, v_center_px, v_diam_px, color)
     # draw second mask with reduced size
-    radii_center = [max(1, int(r*float(params.gen_nodule_masks['reduced_mask_radius_fraction']))) for r in radii]
+    radii_center = [max(2, int(r*float(params.gen_nodule_masks['reduced_mask_radius_fraction']))) for r in radii]
     new_mask_center, bbox_px_center = draw_new_ellipsoid(mask_array_zyx.shape,
                                                          center,
                                                          radii_center,

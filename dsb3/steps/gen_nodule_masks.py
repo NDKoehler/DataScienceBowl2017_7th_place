@@ -264,7 +264,7 @@ def fit_ellipsoid(mask_array_zyx, color, v_center_px, v_diam_px):
                                                        radii_shell,
                                                        rotation, v_center_px, v_diam_px, color)
     # draw second mask with reduced size
-    radii_center = [max(2, int(r*float(params.gen_nodule_masks['reduced_mask_radius_fraction']))) for r in radii]
+    radii_center = [max(1, int(r*float(params.gen_nodule_masks['reduced_mask_radius_fraction']))) for r in radii]
     new_mask_center, bbox_px_center = draw_new_ellipsoid(mask_array_zyx.shape,
                                                          center,
                                                          radii_center,

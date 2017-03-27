@@ -199,7 +199,6 @@ def _init_step(step_name, mode='w'):
     __step_name = step_name
     # create step directories, log files etc.
     step_dir = get_step_dir()
-    print(step_dir)
     # data directory of step
     utils.ensure_dir(step_dir + 'arrays/')
     utils.ensure_dir(step_dir + 'figs/')
@@ -211,6 +210,8 @@ def _run_step(step_name, params):
     info = 'run ' + str(__run) + ' (' + avail_runs[str(__run)][1] + ')' \
            + ' / step ' + str(__step) + ' (' + __step_name + ')' \
            + (' with init ' + str(__init_run) if __init_run > -1 else '')
+    if __step_dir_suffix != '':
+        info += ' / patients ' + __step_dir_suffix.lstrip('_')
     log_pipe.info(info)
     # output params dict for visual check
     params_info = info
@@ -276,9 +277,9 @@ def _init_patients(_n_patients=0, single_patient_id=None, fromto_patients=None):
     elif single_patient_id is not None:
         patients = [single_patient_id]
     elif fromto_patients is not None:
-        print('restricted to patients', fromto_patients, 'including', fromto_patients[-1])
-        patients = patients[fromto_patients[0]:fromto_patients[-1]+1]
-        __step_dir_suffix = '_fromto-' + str(fromto_patients[0]) + '-' + str(fromto_patients[1])
+        print('restricted to patients', fromto_patients)
+        patients = patients[fromto_patients[0]:fromto_patients[-1]]
+        __step_dir_suffix = '_fromto' + str(fromto_patients[0]) + '-' + str(fromto_patients[1])
     global n_patients
     n_patients = len(patients)
     print('considering', n_patients, 'patient' + ('s' if n_patients > 1 else ''))

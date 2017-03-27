@@ -46,7 +46,7 @@ def main():
     aa('--patient', type=str, default=None,
        help='provide id of a single patient')
     aa('--fromto', type=str, default=None, nargs=2,
-       help='provide range of patients, e.g. "0 400" to compute patients [0, 1, ..., 400], i.e., including 400')
+       help='provide range of patients, e.g. "0 400" to compute patients [0, 1, ..., 399]')
     aa('--merge', action='store_const', default=False, const=True,
        help='merge step directories produced with "--fromto"')
     aa('-ds', '--dataset_name', type=str, default=None, metavar='d',
@@ -96,23 +96,29 @@ def main():
             dirs_to_merge = glob(pipe.get_step_dir().rstrip('/') + '_fromto*')
             new_dir = pipe.get_step_dir()
             print('merging', dirs_to_merge, 'to', new_dir)
-            out = OrderedDict()
-            log = ''
+            print('... jsons and logs are appended')
+            out_save = OrderedDict()
+            log_save = ''
             params_save = OrderedDict()
             for d in dirs_to_merge:
                 pipe.__step_dir_suffix = '_' + d.split('_')[-1]
-                out.update(pipe.load_json('out.json'))
+                # read out, params and log file
+                out_save.update(pipe.load_json('out.json'))
                 params_save.update(pipe.load_json('params.json'))
                 with open(pipe.get_step_dir() + '/log.txt') as f:
-                    log += f.read()
+                    log_save += f.read()
+                # this uses the bash shell, should be much faster than the python implementations
                 os.system('mv ' + pipe.get_step_dir() + '/arrays/* ' + new_dir + '/arrays/')
+                old_figs_dir = pipe.get_step_dir() + '/figs/'
+                if os.path.exists(old_figs_dir) and not utils.dir_is_empty(old_figs_dir):
+                    os.system('mv ' + pipe.get_step_dir() + '/figs/* ' + new_dir + '/figs/')
                 os.system('rm -r ' + pipe.get_step_dir())
-            # reset suffix
+            # reset suffix and save jsons and logs
             pipe.__step_dir_suffix = ''
-            pipe.save_json('out.json', out)
-            pipe.save_json('params.json', params_save)
-            with open(pipe.get_step_dir() + '/log.txt', 'w') as f:
-                f.write(log)
+            pipe.save_json('out.json', out_save, mode='a')
+            pipe.save_json('params.json', params_save, mode='a')
+            with open(pipe.get_step_dir() + '/log.txt', 'a') as f:
+                f.write(log_save)
             sys.exit(0)
         pipe._run_step(step_name, getattr(params, step_name))
         #pipe._visualize_step(step_name)

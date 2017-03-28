@@ -307,8 +307,7 @@ def _init_patients_by_label():
                 return False
         elif dataset_name == 'dsb3':
             import pandas as pd
-            #dsb3_labels = pd.read_csv('/'.join(raw_data_dir.split('/')[:-2]) + '/stage1_labels.csv')
-            dsb3_labels = pd.read_csv('./stage1_labels.csv')
+            dsb3_labels = pd.read_csv('/'.join(raw_data_dir.split('/')[:-2]) + '/stage1_labels.csv')
             try:
                 for label in [1, 0, -1]:
                     patients_by_label[label] = dsb3_labels[dsb3_labels['cancer'] == label]['id'].values.tolist()

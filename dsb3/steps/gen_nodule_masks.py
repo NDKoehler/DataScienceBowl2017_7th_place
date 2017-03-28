@@ -204,7 +204,7 @@ def draw_ellipses_in_layers(nodule_annotations, new_mask_array_zyx, affected_lay
     if factor < 1:
         z_radius = factor * (z_max_px - z_min_px) / 2
         z_mean = (z_max_px + z_min_px) / 2
-        z_radius = max(params.gen_nodule_masks['mask2pred_lower_radius_limit_px'], z_radius)
+        z_radius = (max(1,factor * max(params.gen_nodule_masks['mask2pred_lower_radius_limit_px'], z_radius)))
         z_max_px = z_mean + z_radius
         z_min_px = z_mean - z_radius
     for idx, v_layer in enumerate(affected_layers):
@@ -244,7 +244,7 @@ def draw_ellipses_in_layers(nodule_annotations, new_mask_array_zyx, affected_lay
                             int(round(np.sqrt(max(1, x_rad**2 - (radius_decrease * (z_max_px - v_layer))**2)))))
             else:
                 log.pipe.warning('untreated layer in patient', patient)
-        radii_yx = tuple([max(2, v) for v in radii_yx])
+        radii_yx = tuple([max(1, v) for v in radii_yx])
         # get an array for drawing with cv2
         draw_array = new_mask_array_zyx[v_layer, :, :].copy()
         # for calling cv2.ellipse, need to change the convention to xy for center and axes but keep the array the same (i.e. yx)

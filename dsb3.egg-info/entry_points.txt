@@ -1,0 +1,3 @@
+[console_scripts]
+dsb3 = dsb3.__main__:main
+

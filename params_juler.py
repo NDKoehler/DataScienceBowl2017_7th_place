@@ -7,15 +7,15 @@ from collections import OrderedDict
 pipe = OrderedDict([
     ('n_patients', 0), # number of patients to process, 0 means all
 # dataset origin and paths
-    ('dataset_name', 'dsb3'), # 'LUNA16' or 'dsb3'
+    ('dataset_name', 'LUNA16'), # 'LUNA16' or 'dsb3'
     ('raw_data_dirs', {
         'LUNA16': '/media/juler/Data_0/dsb3/raw_data/LUNA16/',
         'dsb3': '/media/juler/Data_0/dsb3/raw_data/dsb3/stage1/',
         #'dsb3': '/',
     }),
     #('write_basedir', '/media/juler/qnap/PROJECTS/dsb3/data_pipeline_gen2/'),
-    #('write_basedir', '/home/juler/Projects/dsb3a/test_LUNA16/'),
-    ('write_basedir', '/home/juler/Projects/dsb3_pipelines/test_dsb3/'),
+    ('write_basedir', '/media/juler/Data_0/dsb3/datapipelines/dsb3/'),
+    ('write_basedir', '/media/juler/Data_0/dsb3/datapipelines/LUNA16_0/'),
     #('write_basedir', '/home/juler/Projects/dsb3a/test/'),
 # data splits
     ('random_seed', 17),
@@ -30,7 +30,7 @@ pipe = OrderedDict([
 # ------------------------------------------------------------------------------
 # step parameters
 # ------------------------------------------------------------------------------
-
+all_patients = False
 assets_path = '../dsb3a_assets/'
 
 resample_lungs = OrderedDict([
@@ -53,16 +53,15 @@ gen_prob_maps = OrderedDict([
                      # valid shape numbers: 256, 304, 320, 352, 384, 400, 416, 448, 464, 480, 496, 512 (dividable by 16)
     ('batch_sizes',  [32, 32, 24, 24, 16, 16, 16, 16, 12, 12, 4, 1]),
     ('data_type', 'uint8'), # uint8, int16 or float32
-    ('image_shape_max_ratio', 0.95),
-    ('checkpoint_dir', assets_path+'checkpoints/gen_prob_maps/nodule_seg_1mm_96x96_1Channel_logloss/'),
-    ('all_patients', True),
+    ('image_shape_max_ratio', 0.98),
+    ('checkpoint_dir', assets_path+'checkpoints/gen_prob_maps/no_ellips_03reduced_rad/'),
+    ('all_patients', all_patients),
 ])
-
 gen_candidates = OrderedDict([
-    ('n_candidates', 20),
+    ('n_candidates', 100),
     ('threshold_prob_map', 0.2),
     ('cube_shape', (32, 32, 32)), # ensure cube_edges are dividable by two -> improvement possible
-    ('all_patients', True),
+    ('all_patients', all_patients),
 ])
 
 interpolate_candidates = OrderedDict([
@@ -77,7 +76,7 @@ filter_candidates = OrderedDict([
     ('n_candidates', 20),
     ('checkpoint_dir', assets_path+'checkpoints/filter_candidates/rank_cross3/'),
     ('num_augs_per_img', 3), # 1 means NO augmentation	
-    ('all_patients', True),
+    ('all_patients', all_patients),
 ])
 
 gen_submission = OrderedDict([
@@ -94,12 +93,12 @@ gen_submission = OrderedDict([
 
 gen_nodule_masks = OrderedDict([
     ('ellipse_mode', False),
-    ('reduced_mask_radius_fraction', 0.85),
-    ('mask2pred_lower_radius_limit_px', 3),
-    ('mask2pred_upper_radius_limit_px', 15),
+    ('reduced_mask_radius_fraction', 0.15),
+    ('mask2pred_lower_radius_limit_px', 5),
+    ('mask2pred_upper_radius_limit_px', 20),
     ('LUNA16_annotations_csv_path', assets_path+'LIDC-annotations_2_nodule-seg_annotations/annotations_min+missing_LUNA16_patients.csv'),
-    ('yx_buffer_px', 1),
-    ('z_buffer_px', 2),
+    ('yx_buffer_px', 0),
+    ('z_buffer_px', 0),
 ])
 
 gen_nodule_seg_data = OrderedDict([
@@ -109,7 +108,7 @@ gen_nodule_seg_data = OrderedDict([
     ('stride', 1),
     ('crop_size', [96, 96]),
     ('view_planes', 'yxz'), 
-    ('num_negative_examples_per_nodule_free_patient_per_view_plane', 40),
+    ('num_negative_examples_per_nodule_free_patient_per_view_plane', 30),
     ('HU_tissue_range', [-1000, 400]), # MIN_BOUND, MAX_BOUND [-1000, 400]
 ])
 
@@ -119,10 +118,10 @@ gen_nodule_seg_data = OrderedDict([
 # ------------------------------------------------------------------------------
 
 gen_candidates_eval = OrderedDict([
-    ('max_n_candidates', 15),
+    ('max_n_candidates', 20),
     ('max_dist_fraction', 0.5),
-    ('priority_threshold', 1), 
-    ('sort_candidates_by', 'nodule_score'),#'prob_sum_min_nodule_size', 'nodule_score'),
+    ('priority_threshold', 3), 
+    ('sort_candidates_by', 'prob_sum_min_nodule_size'),#'prob_sum_min_nodule_size', 'nodule_score'),
     ('all_patients', False)
 ])
 

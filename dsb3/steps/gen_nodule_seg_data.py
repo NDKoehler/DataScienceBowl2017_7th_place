@@ -27,16 +27,15 @@ def run(view_angles,
         num_negative_examples_per_nodule_free_patient_per_view_plane,
         HU_tissue_range):
 
+    # check dataset
     if not pipe.dataset_name == 'LUNA16':
         raise ValueError('gen_nodule_seg_data only valid for dataset LUNA16')
-    # dataset_dir
+        sys.exit()
     # define view_planes
     view_planes = [x if x in ['y', 'x', 'z'] else 'ERROR' for x in natsorted(view_planes)]
     if len(view_planes) == 0:
-        raise ValueError('No view_plane is determined!!!')
-    elif 'ERROR' in view_planes:
-        raise ValueError('wrong view_plane given: {}'.format(view_planes))
-        sys.exit()
+        pipe.log.error("No view_plane is determined!!! Continue with default 'zyx'.")
+        view_planes = ['x','y','z'] # default
     if len(crop_size) != 2:
         raise ValueError('Wrong crop_size. Use format HeightxWidth')
         sys.exit()
@@ -101,53 +100,50 @@ def generate_data_lsts(HU_tissue_range,
             try:
                 patient_json = gen_nodule_masks_json[patient]
             except:
-                raise ValueError('Could not load patient_json for patient {}'.format(patient))
-                continue
+                pipe.log.error('could not load gen_nodule_mask patient_json for patient {}!!!'.format(patient))
+                sys.exit()
             try:
                 scan = pipe.load_array(resample_lungs_json[patient]['basename'], 'resample_lungs')
             except:
-                raise ValueError('Could not find resample_lungs for patient {}'.format(patient))
+                pipe.log.error('could not load resample_lungs_array of patient {}. continue with next patient.'.format(patient))
                 continue
             try:
                 mask = pipe.load_array(gen_nodule_masks_json[patient]['basename'], 'gen_nodule_masks')
             except:
-                raise ValueError('Could not find mask for patient {}'.format(patient))
+                pipe.log.error('could not load mask-array of patient {}. Continue with next patient'.format(patient))
                 continue
 
-            #normalize and zero_center scan and lab
+            #normalize and zero_center scan and lab. Also checking dtyppe
             if scan.dtype == np.int16:
                 scan = ((scan/(float(HU_tissue_range[1]-HU_tissue_range[0])))*255).astype(np.uint8)
             elif scan.dtype == np.float32:
                 scan = (scan*255).astype(np.uint8)
+            elif scan.dtype == np.uint8:
+                scan = scan
+            else:
+                pipe.log.error('dtype of scan for patient {} is NOT one of these [uint8, float32, int16]. Continue with next patient'.format(patient))
             if mask.dtype == np.uint8:
                 mask = mask
             else:
-                print ('ERROR')
-                sys.exit()
-
+                pipe.log.error('dtype of mask for patient {} is NOT uint8. Continue with next patient'.format(patient))
             # combine scan and mask to data
             data = np.zeros(list(scan.shape)+[3], dtype=np.uint8)
             data[:, :, :, 0]   = scan
             data[:, :, :, 1:3] = mask
-
+            # initialize some lists
             images_nodule_free = []
             nodules_extract_coords_lst = []
             nodules_center_coords_lst  = []
             images = []
-
             # get patient infos
             if patient_json['nodule_patient']:
                 nodules = patient_json['nodules']
                 for nodule in nodules:
-
                     #nodule_bounding_box_coords_zyx_px = nodule["nodule_box_ymin/ymax_xmin/xmax_zmin/zmax_px"]
                     factor = 1.0
-
                     nodule_center_zyx_px = nodule['center_zyx_px']
                     nodule_max_diameter_zyx_px = nodule['max_diameter_zyx_px']
-
                     nodule_bounding_box_coords_zyx_px = nodule["nodule_box_zmin/zmax_ymin/ymax_xmin/xmax_px"]
-
                     # ensure points within array
                     nodule_bounding_box_coords_zyx_px = [ensure_point_lst_within_array([nodule_bounding_box_coords_zyx_px[x]], data.shape[x//2])[0] for x in range(6)]
                     # ensure that bounding box has at least num_channel size
@@ -158,10 +154,8 @@ def generate_data_lsts(HU_tissue_range,
                     # ensure points within array
                     nodule_center_box_coords_zyx_px = [ensure_point_lst_within_array([nodule_center_box_coords_zyx_px[x]], data.shape[x//2])[0] for x in range(6)]
                     # draw center
-
                     # loop over view_planes
                     for view_plane in view_planes:
-
                         # get affected layers from scan and homogenize plan orientation (num_channels always in last dimension)
                         if view_plane =='z':
                             center_coords = [nodule_center_box_coords_zyx_px[0], nodule_center_box_coords_zyx_px[1]]
@@ -169,21 +163,18 @@ def generate_data_lsts(HU_tissue_range,
                             nodule_box_coords = [nodule_bounding_box_coords_zyx_px[4], nodule_bounding_box_coords_zyx_px[5], # y on first axis
                                                  nodule_bounding_box_coords_zyx_px[2], nodule_bounding_box_coords_zyx_px[3]] # x on second axis
                             axis = 0
-
                         elif view_plane =='y':
                             center_coords = [nodule_center_box_coords_zyx_px[2], nodule_center_box_coords_zyx_px[3]]
                             shell_coords  = [nodule_bounding_box_coords_zyx_px[2], nodule_bounding_box_coords_zyx_px[3]]
                             nodule_box_coords = [nodule_bounding_box_coords_zyx_px[0], nodule_bounding_box_coords_zyx_px[1], # z on first axis
                                                  nodule_bounding_box_coords_zyx_px[4], nodule_bounding_box_coords_zyx_px[5]] # x on second axis
                             axis = 1
-
                         elif view_plane =='x':
                             center_coords = [nodule_center_box_coords_zyx_px[4], nodule_center_box_coords_zyx_px[5]]
                             shell_coords  = [nodule_bounding_box_coords_zyx_px[4], nodule_bounding_box_coords_zyx_px[5]]
                             nodule_box_coords = [nodule_bounding_box_coords_zyx_px[0], nodule_bounding_box_coords_zyx_px[1], # z on first axis
                                                  nodule_bounding_box_coords_zyx_px[2], nodule_bounding_box_coords_zyx_px[3]] # y on second axis
                             axis = 2
-
                         if use_shell_slices:
                             shell_slices  = get_slice_from_zyx_array(data, shell_coords[0], shell_coords[1], axis=axis)
                             slices = shell_slices
@@ -192,7 +183,6 @@ def generate_data_lsts(HU_tissue_range,
                             slices = center_slices
 
                         num_layers = slices.shape[2]
-
                         # for nodules with many layers split several parts from
                         nodules_pakets = []
                         if num_layers == num_channels:
@@ -201,12 +191,10 @@ def generate_data_lsts(HU_tissue_range,
                             rand_offset = np.random.randint(0,int((num_layers-num_channels) % (stride))+1)
                             for paket in range(int((num_layers-num_channels)/(stride))+1):
                                 nodules_pakets.append(list(np.arange(rand_offset+paket*stride, rand_offset+paket*stride+num_channels)))
-
                         # make nodule_pakets where label is central layer of paket
                         for nodules_paket in nodules_pakets:
                             images.append(slices[:,:,min(nodules_paket):min(nodules_paket)+num_channels])
                             nodules_extract_coords_lst.append(nodule_box_coords)
-
             # get some negative samples for every view_plane
             rand_layers_z = np.random.permutation(range(scan.shape[0]))
             rand_layers_y = np.random.permutation(range(scan.shape[1]))
@@ -231,7 +219,6 @@ def generate_data_lsts(HU_tissue_range,
                             idx3 += np.random.randint(1,crop_size[1]//3)
                         elif rand_black_padding==3:
                             idx4 -= np.random.randint(1,crop_size[1]//3)
-
                     if np.sum(mask[idx0:idx1, idx2:idx3, idx4:idx5]) < 1:
                         images_nodule_free.append(np.swapaxes(data[idx0:idx1, idx2:idx3, idx4:idx5].copy(), 0, 2))
                         # cv2.imwrite('test_imgs/'+'y'+'_'+str(num_data)+'_'+str(len(images_nodule_free))+'_shitto.jpg', data[idx0+(idx1-idx0)//2, idx2:idx3, idx4:idx5,0])
@@ -277,31 +264,25 @@ def generate_data_lsts(HU_tissue_range,
                     if np.sum(mask[idx0:idx1, idx2:idx3, idx4:idx5]) < 1:
                         images_nodule_free.append(data[idx0:idx1, idx2:idx3, idx4:idx5].copy())
                         # cv2.imwrite('test_imgs/'+'z'+'_'+str(num_data)+'_'+str(len(images_nodule_free))+'_shitto.jpg', data[idx0:idx1, idx2:idx3, idx4+(idx5-idx4)//2,0])
-
                 rand_layer_cnt += 1
                 if rand_layer_cnt == min(len(rand_layers_z), len(rand_layers_y), len(rand_layers_x)): break
 
             # loop over all images and labels sprang out from nodule
             cropped_images_lsts = {'nodules': [images, nodules_extract_coords_lst], 'nodule_free': [images_nodule_free, [None]*len(images_nodule_free)]}
-
             for cropped_images_lst_key in cropped_images_lsts.keys():
                 zipped_lsts = cropped_images_lsts[cropped_images_lst_key]
+                # loop over all pakets in images,..
                 for img_cnt in range(len(zipped_lsts[0])):
-
                     org_img = zipped_lsts[0][img_cnt][:,:,:,:1]
                     org_lab = zipped_lsts[0][img_cnt][:,:,:,1:3]
-
                     nodule_box_coords_in_extract = zipped_lsts[1][img_cnt]
-
                     img = np.zeros(crop_size+[num_channels]+[1], dtype=np.uint8)
                     lab = np.zeros(crop_size+[1]+[2], dtype=np.uint8) # first channel ist label to predict, second channel for drawing center
-
                     # crop or pad org_img
                     img_coords = []
                     org_coords = []
                     if patient_json['nodule_patient']:
                         # crop random around nodule or pad black
-
                         # ensure that nodule is within crop
                         for idx in range(2):
                             if crop_size[idx] < org_img.shape[idx]:
@@ -321,13 +302,11 @@ def generate_data_lsts(HU_tissue_range,
                                     img_coords.append(crop_size[idx])
                                     org_coords.append(np.random.randint(0, org_img.shape[idx]-crop_size[idx]))
                                     org_coords.append(org_coords[-1]+crop_size[idx])
-
                             elif crop_size[idx] >= org_img.shape[idx]:
                                 img_coords.append((crop_size[idx]-org_img.shape[idx])/2)
                                 img_coords.append(img_coords[-1]+org_img.shape[idx])
                                 org_coords.append(0)
                                 org_coords.append(org_img.shape[idx])
-
                     else:
                         # crop or pad negative_img
                         for idx in range(2):
@@ -345,32 +324,26 @@ def generate_data_lsts(HU_tissue_range,
                                 # end
                                 img_coords.append(img_coords[-1]+org_img.shape[idx])
                                 org_coords.append(org_img.shape[idx])
-
                     img_coords = [int(x) for x in img_coords]
                     org_coords = [int(x) for x in org_coords]
                     img[img_coords[0]:img_coords[1], img_coords[2]:img_coords[3], :] = org_img[org_coords[0]:org_coords[1], org_coords[2]:org_coords[3]].copy()
                     lab[img_coords[0]:img_coords[1], img_coords[2]:img_coords[3], :] = org_lab[org_coords[0]:org_coords[1], org_coords[2]:org_coords[3]].copy()
-
+                    # stack img and lab and include in all_data lst
                     stacked_data[:,:,:img.shape[-1],:1]  = img.copy()
                     stacked_data[:,:,:lab.shape[-1],1:3] = lab.copy()
-                    
                     all_data.append(stacked_data.copy())
                     out_lst.write('{}\t{}\t{}\t{}\n'.format(num_data, patient, num_patient_data, 1 if cropped_images_lst_key=='nodules' else 0))
                     num_data += 1
-                    num_patient_data += 1                    
-                    
+                    num_patient_data += 1
                     # if 0 and cropped_images_lst_key=='nodules':
                     #     randy = np.random.randint(0,10000)
                     #     cv2.imwrite('test_imgs/'+str(randy)+'_img.jpg', stacked_data[:,:,stacked_data.shape[2]//2,0])
                     #     cv2.imwrite('test_imgs/'+str(randy)+'_lab.jpg', stacked_data[:,:,stacked_data.shape[2]//2,1])
                     #     cv2.imwrite('test_imgs/'+str(randy)+'_center.jpg', stacked_data[:,:,stacked_data.shape[2]//2,2])
-
                     # if num_data == 3000 and 1: 
                     #     out_path = pipe.save_array(basename=lst_type+'.npy' , array=np.array(all_data, dtype=np.uint8), step_name='gen_nodule_seg_data')
                     #     out_lst.close()
                     #     sys.exit()
-
-    print ('---------------NUM_DATA: {}-------------------'.format(num_data))
+    pipe.log.info('{} num data: {}'.format(lst_type, num_data))
     print ('saving npy-construct')
     out_path = pipe.save_array(basename=lst_type+'.npy' , array=np.array(all_data, dtype=np.uint8), step_name='gen_nodule_seg_data')
-    print ('saved npy for list {} to {}. Its shape is {}.'.format( lst_type, out_path, np.array(all_data).shape))

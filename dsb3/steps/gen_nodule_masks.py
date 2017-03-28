@@ -178,6 +178,10 @@ def make_nodule(patient, nodule_annotations,
     start_layer = max(0, z_min_px - z_buffer_px)
     end_layer = min(new_mask_array_zyx[:, :, :, 0].shape[0] - 1,
                     (z_max_px + z_buffer_px))
+    # ensure lower_limit_radius
+    central_layer = (end_layer+start_layer)//2
+    start_layer   = min(start_layer, central_layer-params.gen_nodule_masks['mask2pred_lower_radius_limit_px'])
+    end_layer     = max(end_layer, central_layer-params.gen_nodule_masks['mask2pred_lower_radius_limit_px'])
     affected_layers = list(range(start_layer, end_layer + 1))
 
     # draw full thickness if thickness == -1, otherwise restrict to thickness 2

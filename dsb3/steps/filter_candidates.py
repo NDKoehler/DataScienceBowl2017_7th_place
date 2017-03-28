@@ -13,7 +13,6 @@ from .. import tf_tools
 
 def run(num_augs_per_img,
         checkpoint_dir,
-        batch_size,
         n_candidates,
         all_patients):
     # load some information json
@@ -22,7 +21,11 @@ def run(num_augs_per_img,
     # get some parameters
     net_config = {}
     net_config['gpu_fraction']   = pipe.GPU_memory_fraction
-    net_config['batch_size']     = batch_size
+    batch_size = num_augs_per_img
+    max_batch_size = 64
+    if batch_size>max_batch_size:
+        pipe.log.info('batch_size param is set from {} to max_batch_size {}'.format(batch_size, max_batch_size))
+    net_config['batch_size']     = min(batch_size, max_batch_size) # set maximal batchsize
     net_config['checkpoint_dir'] = checkpoint_dir
     net_config['GPUs'] =  pipe.GPU_ids
     # generate nodule_score_session
@@ -35,12 +38,16 @@ def run(num_augs_per_img,
     for lst_type in splits:
         patients_DF_path = pipe.get_step_dir('interpolate_candidates') + lst_type + '_patients.lst'
         if os.path.exists(patients_DF_path):
-            patients_DF = pd.read_csv(patients_DF_path, sep = '\t', header=None)
+            try:
+                patients_DF = pd.read_csv(patients_DF_path, sep = '\t', header=None)
+            except:
+                pipe.log.error(' some error occured reading patients list {}. continue with next list.'.format(lst_type))
+                continue
         else:
-            raise IOError('empty patients list {}. continue with next list.'.format(lst_type))
+            pipe.log.error('patients list {} does not exist. continue with next list.'.format(lst_type))
             continue
         if len(patients_DF) == 0:
-            raise IOError('could not load list {}'.format(lst_type))
+            pipe.log.error('empty patient list {}'.format(lst_type))
             continue
         # initialize out_list
         open(pipe.get_step_dir() + lst_type + '_candidates_filtered.lst', 'w').close()
@@ -75,9 +82,9 @@ def run(num_augs_per_img,
             out_candidates_idx = out_candidates_idx[:n_candidates]
             for idx_cnt, idx in enumerate(out_candidates_idx):
                 if idx_cnt==0:
-                    out_candidates = all_candidates[idx]
+                    out_candidates = np.expand_dims(all_candidates[idx], axis=0)
                 else:
-                    out_candidates = np.vstack([out_candidates, all_candidates[idx]])
+                    out_candidates = np.vstack([out_candidates, np.expand_dims(all_candidates[idx], axis=0)])
             path = pipe.save_array(patient + '.npy', out_candidates)
             with open(pipe.get_step_dir() + lst_type + '_candidates_filtered.lst', 'a') as out_lst:
                 for idx_cnt, idx in enumerate(out_candidates_idx):
@@ -141,19 +148,23 @@ class score_nodules():
             nodule_score value range [0.0, 1.0]
         task:
             calculates the nodule_score by meaning augmented (optional) predictions
+        ATTENTION:
+            num_augs_per_img == 1 means that first prediction is not augmented!
         '''
         # clean batch
         self.batch[:] = -0.25
         self.cand_predictions[:] = 0.0
         for b_cnt in range(self.num_batches):
             for cnt in range(self.batch_size):
-                if b_cnt*self.batch_size + cnt >= self.num_augs_per_img: break
+                if b_cnt*self.batch_size + cnt >= self.num_augs_per_img:
+                    break
                 self.batch[cnt] = self.pred_iter.AugmentData(candidate.copy())
             predictions = self.sess.run(self.pred_ops, feed_dict = {self.data['images']: self.batch})['probs']
             self.cand_predictions[b_cnt*self.batch_size:min(self.num_augs_per_img,(b_cnt+1)*self.batch_size)] = \
                            predictions[:min(self.num_augs_per_img,
                                         (b_cnt+1)*self.batch_size)-b_cnt*self.batch_size, 0]
-        total_prediction = np.mean(self.cand_predictions)
+        # do NOT use mean here due to the case that the final batch can have dummies
+        total_prediction = np.sum(self.cand_predictions)/self.num_augs_per_img
         if self.dataset_name == 'LUNA16':
             logloss = self.logloss(total_prediction, 1 if lab>0 else 0)
             return total_prediction, logloss

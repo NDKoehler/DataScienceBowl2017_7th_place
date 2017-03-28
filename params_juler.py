@@ -9,13 +9,14 @@ pipe = OrderedDict([
 # dataset origin and paths
     ('dataset_name', 'dsb3'), # 'LUNA16' or 'dsb3'
     ('raw_data_dirs', {
-        'LUNA16': '/media/juler/qnap/DATA/LUNA16/0_raw_data/',
-        #'dsb3': '/media/juler/qnap/DATA/dsb3/stage1/',
-        'dsb3': '/',
+        'LUNA16': '/media/juler/Data_0/dsb3/raw_data/LUNA16/',
+        'dsb3': '/media/juler/Data_0/dsb3/raw_data/dsb3/stage1/',
+        #'dsb3': '/',
     }),
     #('write_basedir', '/media/juler/qnap/PROJECTS/dsb3/data_pipeline_gen2/'),
     #('write_basedir', '/home/juler/Projects/dsb3a/test_LUNA16/'),
-    ('write_basedir', '/home/juler/Projects/dsb3a/test_dsb3/'),
+    ('write_basedir', '/home/juler/Projects/dsb3_pipelines/test_dsb3/'),
+    #('write_basedir', '/home/juler/Projects/dsb3a/test/'),
 # data splits
     ('random_seed', 17),
                        # tr  va   ho
@@ -30,6 +31,8 @@ pipe = OrderedDict([
 # step parameters
 # ------------------------------------------------------------------------------
 
+assets_path = '../dsb3a_assets/'
+
 resample_lungs = OrderedDict([
     ('new_spacing_zyx', [1, 1, 1]), # z, y, x
     ('HU_tissue_range', [-1000, 400]), # MIN_BOUND, MAX_BOUND [-1000, 400]
@@ -37,8 +40,7 @@ resample_lungs = OrderedDict([
     ('bounding_box_buffer_yx_px', [12, 12]), # y, x
     ('seg_max_shape_yx', [512, 512]), # y, x
     ('batch_size', 64), # 128 for target_spacing 0.5, 64 for target_spacing 1.0
-
-    ('checkpoint_dir', './checkpoints/resample_lungs/lung_wings_segmentation'),
+    ('checkpoint_dir', assets_path+'checkpoints/resample_lungs/lung_wings_segmentation'),
 ])
 
 gen_prob_maps = OrderedDict([
@@ -52,7 +54,7 @@ gen_prob_maps = OrderedDict([
     ('batch_sizes',  [32, 32, 24, 24, 16, 16, 16, 16, 12, 12, 4, 1]),
     ('data_type', 'uint8'), # uint8, int16 or float32
     ('image_shape_max_ratio', 0.95),
-    ('checkpoint_dir', './checkpoints/gen_prob_maps/nodule_seg_1mm_96x96_1Channel_logloss/'),
+    ('checkpoint_dir', assets_path+'checkpoints/gen_prob_maps/nodule_seg_1mm_96x96_1Channel_logloss/'),
     ('all_patients', True),
 ])
 
@@ -73,19 +75,17 @@ interpolate_candidates = OrderedDict([
 
 filter_candidates = OrderedDict([
     ('n_candidates', 20),
-    ('checkpoint_dir', './checkpoints/filter_candidates/rank_cross3/'),
-    ('num_augs_per_img', 3),
-    ('batch_size', 1), 
+    ('checkpoint_dir', assets_path+'checkpoints/filter_candidates/rank_cross3/'),
+    ('num_augs_per_img', 3), # 1 means NO augmentation	
     ('all_patients', True),
 ])
 
 gen_submission = OrderedDict([
-    ('candidates_for_submission_folder', False), # False or None -> filtered_candidates
-    ('splitting', 'validation'), # 'validation' or 'submission' or 'holdout'
-    ('checkpoint_dir', './checkpoints/gen_submission/cross_crop_retrain_further'),
-    ('num_augs_per_img', 5), # 1==NOT augmented!!! batch_size is equal ti num_augmented_data but max 64
-    ('submission_lst_path', '../dsb3a_assets/dsb3/stage1_sample_submission.csv'),
-
+    ('splitting', 'validation'), # 'validation' or 'submission' or 'holdout'<-not implemented yet
+    ('checkpoint_dir', assets_path+'checkpoints/gen_submission/cross_crop_retrain_further'),
+    ('patients_lst_path', 'filter_candidates'), # if False->filter_candidates; if 'interpolate_candidates'->lst and arrays from current dataset is used
+    ('num_augs_per_img', 5),
+    ('sample_submission_lst_path', '../raw_data/dsb3/stage1_sample_submission.csv'),
 ])
 
 # ------------------------------------------------------------------------------
@@ -93,11 +93,11 @@ gen_submission = OrderedDict([
 # ------------------------------------------------------------------------------
 
 gen_nodule_masks = OrderedDict([
-    ('ellipse_mode', True),
-    ('reduced_mask_radius_fraction', 0.5),
+    ('ellipse_mode', False),
+    ('reduced_mask_radius_fraction', 0.85),
     ('mask2pred_lower_radius_limit_px', 3),
     ('mask2pred_upper_radius_limit_px', 15),
-    ('LUNA16_annotations_csv_path', '../dsb3a_assets/LIDC-annotations_2_nodule-seg_annotations/annotations_min+missing_LUNA16_patients.csv'),
+    ('LUNA16_annotations_csv_path', assets_path+'LIDC-annotations_2_nodule-seg_annotations/annotations_min+missing_LUNA16_patients.csv'),
     ('yx_buffer_px', 1),
     ('z_buffer_px', 2),
 ])

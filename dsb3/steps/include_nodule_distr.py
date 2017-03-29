@@ -59,9 +59,10 @@ def run(n_candidates=20, bin_size=0.05, kernel_width=0.2, xg_max_depth=2, xg_eta
     nodule_dists_mutual = np.array(nodule_dists_mutual)
     nodule_dists_from_lung = np.array(nodule_dists_from_lung)
     nodule_dists_evalues = np.array(nodule_dists_evalues)
-    X = np.concatenate((nodule_weights, nodule_dists_from_lung, nodule_dists_mutual, nodule_dists_evalues), axis=1)
+    # try out different combinations of features
+    # X = np.concatenate((nodule_weights, nodule_dists_from_lung, nodule_dists_mutual, nodule_dists_evalues), axis=1)
     # X = nodule_dists_evalues
-    # X = nodule_weights
+    X = nodule_weights
     # X = nodule_dists_from_lung
 
     # choose validation and training sets

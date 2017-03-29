@@ -5,6 +5,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from scipy.spatial import distance
 from numpy.linalg import eigh
+from matplotlib import pyplot as plt
 import sklearn.metrics
 import xgboost as xgb
 from .. import pipeline as pipe
@@ -65,33 +66,54 @@ def run(n_candidates=20, bin_size=0.05, kernel_width=0.2, xg_max_depth=2, xg_eta
     X = nodule_weights
     # X = nodule_dists_from_lung
 
-    # choose validation and training sets
-    tr = np.in1d(patients, np.array(pipe.patients_by_split['tr']))
-    va = np.in1d(patients, np.array(pipe.patients_by_split['va'])) # validation set
-    # va = np.in1d(patients, np.array(pipe.patients_by_label[-1])) # submission set
+    filename_assets = '../dsb3a_assets/patients_lsts/' + pipe.dataset_name + '/json/patients_by_split.json'
+    patients_by_split = json.load(open(filename_assets), object_pairs_hook=OrderedDict)
 
-    X_train = X[tr]
-    X_test = X[va]
-    y_train = labels[tr]
-    y_test = labels[va]
+    # validation_patients = np.intersect1d(pipe.patients_by_split['va'], patients_by_split['va'])
+    # np.set_printoptions(precision=2)
 
-    # using xgboost
-    xg_params = {'max_depth':xg_max_depth, 'eta':xg_eta, 'silent':1, 'objective':'binary:logistic'}
-    dtrain = xgb.DMatrix(X_train, label=y_train)
-    dtest = xgb.DMatrix(X_test, label=y_test)
-    bst = xgb.train(xg_params, dtrain, xg_num_round)
-    predictions = bst.predict(dtest)
-    if y_test[0] != -1: # if we have a test set with known labels
-        log_loss = sklearn.metrics.log_loss(y_test, predictions)
-        print('xgboost')
-        print(log_loss)
-    else:
-        log_loss = None
-        import pandas as pd
-        sample_submission = pd.read_csv('/'.join(pipe.raw_data_dir.split('/')[:-2]) + '/stage1_sample_submission.csv') # header: id, cancer
-        for pa_cnt, patient in enumerate(pipe.patients_by_label[-1]):
-            sample_submission.loc[pa_cnt, 'cancer'] = predictions[pa_cnt]
-        sample_submission.to_csv(pipe.get_step_dir() + 'submission.csv', index=False)
+    for patients_by_split in [pipe.patients_by_split]:
+        # choose validation and training sets
+        tr = np.in1d(patients, patients_by_split['tr'])
+        va = np.in1d(patients, patients_by_split['va']) # validation set
+        # va = np.in1d(patients, pipe.patients_by_label[-1]) # submission set
+
+        X_train = X[tr]
+        X_test = X[va]
+        y_train = labels[tr]
+        y_test = labels[va]
+
+        # using xgboost
+        xg_params = {'max_depth':xg_max_depth, 'eta':xg_eta, 'silent':1, 'objective':'binary:logistic'}
+        dtrain = xgb.DMatrix(X_train, label=y_train)
+        dtest = xgb.DMatrix(X_test, label=y_test)
+        bst = xgb.train(xg_params, dtrain, xg_num_round)
+        predictions = bst.predict(dtest)
+        if y_test[0] != -1: # if we have a test set with known labels
+            log_loss_patient = np.array([-np.log(p) if y == 1 else -np.log(1-p) for y, p in zip(y_test, predictions)])
+            idcs = np.argsort(log_loss_patient)[::-1]
+            print('label 20 worst', y_test[idcs[:20]])
+            print('logloss 20 worst', log_loss_patient[idcs[:20]])
+            # print(X_test[idcs[:2]])
+            print('label 150 best', y_test[idcs[-150:]])
+            print('logloss 150 best', log_loss_patient[idcs[-150:]])
+            # print(X_test[idcs[-2:]])
+            plt.plot(log_loss_patient[idcs])
+            # log_loss = sklearn.metrics.log_loss(y_test[idcs][10:], predictions[idcs][10:])
+            log_loss = sklearn.metrics.log_loss(y_test[idcs], predictions[idcs])
+            print('xgboost')
+            print(log_loss)
+        else:
+            log_loss = None
+            import pandas as pd
+            sample_submission = pd.read_csv('/'.join(pipe.raw_data_dir.split('/')[:-2]) + '/stage1_sample_submission.csv') # header: id, cancer
+            for pa_cnt, patient in enumerate(pipe.patients_by_label[-1]):
+                sample_submission.loc[pa_cnt, 'cancer'] = predictions[pa_cnt]
+            sample_submission.to_csv(pipe.get_step_dir() + 'submission.csv', index=False)
+        
+    plt.ylabel('log loss per patient')
+    plt.xlabel('patient in va set')
+    plt.savefig('logloss.png')
 
     # using sklearn
     if False:

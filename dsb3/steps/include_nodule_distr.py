@@ -20,58 +20,55 @@ def run(**params):
     resample_lungs_out = pipe.load_json('out.json', 'resample_lungs')
     gen_candidates_out = pipe.load_json('out.json', 'gen_candidates')
 
+    bin_size = 0.05
     n_candidates = 20
-    n_dim = int(n_candidates * (n_candidates - 1) / 2)
+    n_pairs = int(n_candidates * (n_candidates-1)/2)
     patients = []
     labels = []
-    nodule_dists = []
-    nodule_dists_evalues = []
     nodule_weights = []
+    nodule_dists_mutual = []
+    nodule_dists_evalues = []
     nodule_dists_from_lung = []
     for patient, patient_json in gen_candidates_out.items():
         patients.append(patient)
         # cancer label
         labels.append(patient_json['label'])
         # nodule info
-        nodule_pos = []
-        nodule_weight = []
+        positions = []
+        weights = []
         for cluster in patient_json['clusters']:
-            nodule_pos.append(cluster['center_px'])
-            nodule_weight.append(cluster['prob_sum_cluster'])
+            positions.append(cluster['center_px'])
+            weights.append(cluster['prob_sum_cluster'])
         # nodule weights
-        nodule_weight = np.array(sorted(nodule_weight, reverse=True))
-        if nodule_weight.shape[0] < n_candidates:
-            nodule_weight = np.concatenate((np.zeros(n_candidates - nodule_weight.shape[0]), nodule_weight))
-        nodule_weights.append(nodule_weight)
+        weights = np.array(sorted(weights, reverse=True)) # high-weight nodules to the front
+        if weights.shape[0] < n_candidates: # fill up the last places with zeros NOTE that filling up the first places lead to a better result, but is inconsistent
+            weights = np.concatenate((weights, np.zeros(n_candidates - weights.shape[0])))
+        nodule_weights.append(weights)
         # nodule positions
-        nodule_pos = np.array(nodule_pos)
+        positions = np.array(positions)
         lung_shape = np.array(resample_lungs_out[patient]['resampled_scan_shape_zyx_px'])
-        nodule_pos = 2 * nodule_pos / lung_shape[None, :] - 1 # coordinate system in the center of the lung
+        positions = 2*positions/lung_shape[None, :] - 1 # coordinate system in the center of the lung, distance to each boundary is 1
         # distance from lung boundaries
-        dist_from_lung = 1 - np.max(np.abs(nodule_pos), axis=1)
-        dist_from_lung = np.histogram(dist_from_lung, bins=np.arange(0, 1.2, 0.05))[0] / len(dist_from_lung)
+        dist_from_lung = 1 - np.max(np.abs(positions), axis=1)
+        dist_from_lung = np.histogram(dist_from_lung, bins=np.arange(0, 1 + bin_size, bin_size))[0] / len(positions) # maximal value is 1, normalize with number of clusters
         nodule_dists_from_lung.append(dist_from_lung)
-        # distance from each other
-        nodule_dist = distance.pdist(nodule_pos)
-        nodule_dist = np.histogram(nodule_dist, bins=np.arange(0, 2, 0.05))[0] / len(nodule_dist)
-        nodule_dists.append(nodule_dist)
+        # mutual distance
+        dist_mutual = distance.pdist(positions)
+        dist_mutual = np.histogram(dist_mutual, bins=np.arange(0, 2*np.sqrt(2) + bin_size, bin_size))[0] / len(positions) # maximal value is diagonal 2 * sqrt(2)
+        nodule_dists_mutual.append(dist_mutual)
         # kernel and eigenvalues of distance matrix
-        #     nodule_dist_kernel = np.exp(-distance.squareform(nodule_dist)/0.2)
-        #     nodule_dist_evalues, _ = eigh(nodule_dist_kernel)
-        #     nodule_dist.sort()
-        #     if nodule_dist.shape[0] < n_dim:
-        #         nodule_dist = np.concatenate((np.zeros(n_dim - nodule_dist.shape[0]), nodule_dist))
-        #     if nodule_dist_evalues.shape[0] < n_candidates:
-        #         nodule_dist_evalues = np.concatenate((np.zeros(n_candidates - nodule_dist_evalues.shape[0]), nodule_dist_evalues))
-        #     nodule_dists_evalues.append(nodule_dist_evalues)
+        evalues, _ = eigh(np.exp(-distance.squareform(distance.pdist(positions))/0.2)) # simply an exponetial decrease, eigenvalues in ascending order
+        if evalues.shape[0] < n_candidates:
+            evalues = np.concatenate((np.zeros(n_candidates - evalues.shape[0]), evalues))
+        nodule_dists_evalues.append(evalues)
 
     patients = np.array(patients)
     labels = np.array(labels)
-    nodule_dists = np.array(nodule_dists)
     nodule_weights = np.array(nodule_weights)
+    nodule_dists_mutual = np.array(nodule_dists_mutual)
     nodule_dists_from_lung = np.array(nodule_dists_from_lung)
-    # nodule_dists_evalues = np.array(nodule_dists_evalues)
-    X = np.concatenate((nodule_weights, nodule_dists_from_lung, nodule_dists), axis=1)
+    nodule_dists_evalues = np.array(nodule_dists_evalues)
+    X = np.concatenate((nodule_weights, nodule_dists_from_lung, nodule_dists_mutual, nodule_dists_evalues), axis=1)
     # X = nodule_dists_evalues
     # X = nodule_weights
     # X = nodule_dists_from_lung

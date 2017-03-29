@@ -64,9 +64,11 @@ def run(n_candidates=20, bin_size=0.05, kernel_width=0.2, xg_max_depth=2, xg_eta
     # X = nodule_weights
     # X = nodule_dists_from_lung
 
+    # choose validation and training sets
     tr = np.in1d(patients, np.array(pipe.patients_by_split['tr']))
-    va = np.in1d(patients, np.array(pipe.patients_by_split['va']))
-    
+    va = np.in1d(patients, np.array(pipe.patients_by_split['va'])) # validation set
+    # va = np.in1d(patients, np.array(pipe.patients_by_label[-1])) # submission set
+
     X_train = X[tr]
     X_test = X[va]
     y_train = labels[tr]
@@ -78,9 +80,17 @@ def run(n_candidates=20, bin_size=0.05, kernel_width=0.2, xg_max_depth=2, xg_eta
     dtest = xgb.DMatrix(X_test, label=y_test)
     bst = xgb.train(xg_params, dtrain, xg_num_round)
     predictions = bst.predict(dtest)
-    log_loss = sklearn.metrics.log_loss(y_test, predictions)
-    print('xgboost')
-    print(log_loss)
+    if y_test[0] != -1: # if we have a test set with known labels
+        log_loss = sklearn.metrics.log_loss(y_test, predictions)
+        print('xgboost')
+        print(log_loss)
+    else:
+        log_loss = None
+        import pandas as pd
+        sample_submission = pd.read_csv('/'.join(pipe.raw_data_dir.split('/')[:-2]) + '/stage1_sample_submission.csv') # header: id, cancer
+        for pa_cnt, patient in enumerate(pipe.patients_by_label[-1]):
+            sample_submission.loc[pa_cnt, 'cancer'] = predictions[pa_cnt]
+        sample_submission.to_csv(pipe.get_step_dir() + 'submission.csv', index=False)
 
     # using sklearn
     if False:

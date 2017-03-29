@@ -303,15 +303,18 @@ def _init_patients_by_label():
                     patients_by_label[label] = [patient for patient in patients if nodule_masks_json[patient]['nodule_patient'] == bool(label)]
                 json.dump(patients_by_label, open(filename, 'w'), indent=4)
             except (FileNotFoundError, KeyError):
-                print('Could not create splits and patients with labels list. Run enough patients in "gen_nodule_masks" first.')
-                log_pipe.warning('Could not create splits and patients with labels list. Run enough patients in "gen_nodule_masks" first.')
+                msg = 'Could not create splits and patients with labels list. Run enough patients in "gen_nodule_masks" first.'
+                print(msg)
+                log_pipe.warning(msg)
                 return False
         elif dataset_name == 'dsb3':
             import pandas as pd
             dsb3_labels = pd.read_csv('/'.join(raw_data_dir.split('/')[:-2]) + '/stage1_labels.csv')
             try:
-                for label in [1, 0, -1]:
+                for label in [1, 0]:
                     patients_by_label[label] = dsb3_labels[dsb3_labels['cancer'] == label]['id'].values.tolist()
+                dsb3_submission = pd.read_csv('/'.join(raw_data_dir.split('/')[:-2]) + '/stage1_sample_submission.csv')
+                patients_by_label[-1] = dsb3_submission['id'].values.tolist()
                 for patient in patients:
                     patients_label[patient] = {}
                     if patient in set(dsb3_labels['id'].values.tolist()):

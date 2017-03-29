@@ -53,7 +53,8 @@ gen_prob_maps = OrderedDict([
     ('data_type', 'uint8'), # uint8, int16 or float32
     ('image_shape_max_ratio', 0.95),
     ('all_patients', all_patients),
-    ('checkpoint_dir', checkpoints_dir + 'gen_prob_maps/nodule_seg_1mm_128x128_5Channels_multiview'),
+    # ('checkpoint_dir', checkpoints_dir + 'gen_prob_maps/nodule_seg_1mm_128x128_5Channels_multiview'),
+    ('checkpoint_dir', checkpoints_dir + 'gen_prob_maps/nodule_seg_gen6'),
 ])
 
 gen_candidates = OrderedDict([
@@ -83,7 +84,14 @@ gen_submission = OrderedDict([
     ('sample_submission_lst_path', '../raw_data/dsb3/stage1_sample_submission.csv'),
 ])
 
-include_nodule_distr = OrderedDict()
+include_nodule_distr = OrderedDict([
+    ('n_candidates', 20), 
+    ('bin_size', 0.05), 
+    ('kernel_width', 0.2), 
+    ('xg_max_depth', 2), 
+    ('xg_eta', 1), 
+    ('xg_num_round', 2)
+])
 
 # ------------------------------------------------------------------------------
 # nodule segmentation parameters
@@ -117,7 +125,7 @@ gen_nodule_seg_data = OrderedDict([
 gen_candidates_eval = OrderedDict([
     ('max_n_candidates', 20),
     ('max_dist_fraction', 0.5),
-    ('priority_threshold', 1),
+    ('priority_threshold', 3),
     ('sort_candidates_by', 'prob_sum_min_nodule_size'),
     ('all_patients', False)
 ])

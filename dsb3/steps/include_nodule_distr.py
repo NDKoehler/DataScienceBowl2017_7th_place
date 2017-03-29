@@ -1,27 +1,18 @@
 import numpy as np
-from collections import OrderedDict
 import json
-import matplotlib.pyplot as pl
-from sklearn import datasets
-from sklearn.naive_bayes import GaussianNB
+from collections import OrderedDict
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.svm import LinearSVC
-from sklearn.calibration import calibration_curve
-from sklearn.manifold import TSNE
-from sklearn.decomposition import PCA
 from scipy.spatial import distance
 from numpy.linalg import eigh
-from sklearn.metrics import log_loss
+import sklearn.metrics
 import xgboost as xgb
 from .. import pipeline as pipe
 
-def run(**params):
+def run(n_candidates=20, bin_size=0.05, kernel_width=0.2, xg_max_depth=2, xg_eta=1, xg_num_round=2):
     resample_lungs_out = pipe.load_json('out.json', 'resample_lungs')
     gen_candidates_out = pipe.load_json('out.json', 'gen_candidates')
 
-    bin_size = 0.05
-    n_candidates = 20
     n_pairs = int(n_candidates * (n_candidates-1)/2)
     patients = []
     labels = []
@@ -36,7 +27,7 @@ def run(**params):
         # nodule info
         positions = []
         weights = []
-        for cluster in patient_json['clusters']:
+        for cluster in patient_json['clusters'][:n_candidates]:
             positions.append(cluster['center_px'])
             weights.append(cluster['prob_sum_cluster'])
         # nodule weights
@@ -57,7 +48,7 @@ def run(**params):
         dist_mutual = np.histogram(dist_mutual, bins=np.arange(0, 2*np.sqrt(2) + bin_size, bin_size))[0] / len(positions) # maximal value is diagonal 2 * sqrt(2)
         nodule_dists_mutual.append(dist_mutual)
         # kernel and eigenvalues of distance matrix
-        evalues, _ = eigh(np.exp(-distance.squareform(distance.pdist(positions))/0.2)) # simply an exponetial decrease, eigenvalues in ascending order
+        evalues, _ = eigh(np.exp(-distance.squareform(distance.pdist(positions))/kernel_width)) # simply an exponetial decrease, eigenvalues in ascending order
         if evalues.shape[0] < n_candidates:
             evalues = np.concatenate((np.zeros(n_candidates - evalues.shape[0]), evalues))
         nodule_dists_evalues.append(evalues)
@@ -82,35 +73,28 @@ def run(**params):
     y_test = labels[va]
 
     # using xgboost
-    param = {'max_depth':2, 'eta':1, 'silent':1, 'objective':'binary:logistic' }
-    num_round = 2
+    xg_params = {'max_depth':xg_max_depth, 'eta':xg_eta, 'silent':1, 'objective':'binary:logistic'}
     dtrain = xgb.DMatrix(X_train, label=y_train)
     dtest = xgb.DMatrix(X_test, label=y_test)
-    bst = xgb.train(param, dtrain, num_round)
-    prob_pos = bst.predict(dtest)
+    bst = xgb.train(xg_params, dtrain, xg_num_round)
+    predictions = bst.predict(dtest)
+    log_loss = sklearn.metrics.log_loss(y_test, predictions)
     print('xgboost')
-    print(log_loss(y_test, prob_pos))
+    print(log_loss)
 
     # using sklearn
-    # lr = LogisticRegression()
-    # rfc = RandomForestClassifier(n_estimators=1000)
-    # for clf, name in [(lr, 'sklearn logistic regression'),
-    #                   (rfc, 'sklearn random forest')]:
-    #     clf.fit(X_train, y_train)
-    #     if hasattr(clf, 'predict_proba'):
-    #         prob_pos = clf.predict_proba(X_test)[:, 1]
-    #     else:  # use decision function
-    #         prob_pos = clf.decision_function(X_test)
-    #         prob_pos = (prob_pos - prob_pos.min()) / (prob_pos.max() - prob_pos.min())
-    #     print(name)
-    #     print(log_loss(y_test, prob_pos))
+    if False:
+        lr = LogisticRegression()
+        rfc = RandomForestClassifier(n_estimators=1000)
+        for clf, name in [(lr, 'sklearn logistic regression'),
+                          (rfc, 'sklearn random forest')]:
+            clf.fit(X_train, y_train)
+            if hasattr(clf, 'predict_proba'):
+                predictions = clf.predict_proba(X_test)[:, 1]
+            else:  # use decision function
+                predictions = clf.decision_function(X_test)
+                predictions = (predictions - predictions.min()) / (predictions.max() - predictions.min())
+            print(name)
+            print(log_loss(y_test, predictions))
 
-    # Y = TSNE().fit_transform(X_train)
-    # pl.scatter(Y[:, 0], Y[:, 1], c=y_train)
-    # pl.savefig('tsne.png')
-    # pl.show()
-
-    # Y = PCA().fit_transform(X_train)
-    # pl.scatter(Y[:, 0], Y[:, 1], c=y_train)
-    # pl.savefig('pca.png')
-    # pl.show()
+    return log_loss

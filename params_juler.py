@@ -14,8 +14,8 @@ pipe = OrderedDict([
         #'dsb3': '/',
     }),
     #('write_basedir', '/media/juler/qnap/PROJECTS/dsb3/data_pipeline_gen2/'),
-    ('write_basedir', '/media/juler/Data_0/dsb3/datapipelines/dsb3/'),
-    ('write_basedir', '/media/juler/Data_0/dsb3/datapipelines/LUNA16_0/'),
+    #('write_basedir', '/media/juler/Data_0/dsb3/datapipelines/dsb3/'),
+    ('write_basedir', '/media/juler/Data_0/dsb3/datapipelines/LUNA16_TEST/'),
     #('write_basedir', '/home/juler/Projects/dsb3a/test/'),
 # data splits
     ('random_seed', 17),
@@ -92,8 +92,8 @@ gen_submission = OrderedDict([
 # ------------------------------------------------------------------------------
 
 gen_nodule_masks = OrderedDict([
-    ('ellipse_mode', False),
-    ('reduced_mask_radius_fraction', 0.15),
+    ('ellipse_mode', True),
+    ('reduced_mask_radius_fraction', 0.5),
     ('mask2pred_lower_radius_limit_px', 5),
     ('mask2pred_upper_radius_limit_px', 20),
     ('LUNA16_annotations_csv_path', assets_path+'LIDC-annotations_2_nodule-seg_annotations/annotations_min+missing_LUNA16_patients.csv'),
@@ -108,7 +108,7 @@ gen_nodule_seg_data = OrderedDict([
     ('stride', 1),
     ('crop_size', [96, 96]),
     ('view_planes', 'yxz'), 
-    ('num_negative_examples_per_nodule_free_patient_per_view_plane', 30),
+    ('num_negative_examples_per_nodule_free_patient_per_view_plane', 40),
     ('HU_tissue_range', [-1000, 400]), # MIN_BOUND, MAX_BOUND [-1000, 400]
 ])
 

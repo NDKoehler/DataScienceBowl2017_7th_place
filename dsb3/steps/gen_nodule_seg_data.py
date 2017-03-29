@@ -89,13 +89,14 @@ def generate_data_lsts(HU_tissue_range,
         use_shell_slices=False):
     # initialize some vars
     num_data = 0
-    num_patient_data = 0
+    patient_slice_num = 0
     all_data = []
     stacked_data = np.zeros(list(crop_size)+[num_channels]+[3], dtype=np.uint8)
 
-    with open(pipe.get_step_dir() + lst_type + '_nodule_seg_data.lst', 'w') as out_lst:
+    lst_out_path = pipe.get_step_dir() + lst_type + '_nodule_seg_data.lst'
+    with open(lst_out_path, 'w') as out_lst:
         for pa_cnt, patient in enumerate(tqdm(patient_lst)):
-            num_patient_data = 0
+            patient_slice_num = 0
 
             try:
                 patient_json = gen_nodule_masks_json[patient]
@@ -133,7 +134,9 @@ def generate_data_lsts(HU_tissue_range,
             # initialize some lists
             images_nodule_free = []
             nodules_extract_coords_lst = []
+            num_nodule_pakets_lst = []
             nodules_center_coords_lst  = []
+            nodule_id_lst = []
             images = []
             # get patient infos
             if patient_json['nodule_patient']:
@@ -148,7 +151,7 @@ def generate_data_lsts(HU_tissue_range,
                     nodule_bounding_box_coords_zyx_px = [ensure_point_lst_within_array([nodule_bounding_box_coords_zyx_px[x]], data.shape[x//2])[0] for x in range(6)]
                     # ensure that bounding box has at least num_channel size
                     nodule_bounding_box_coords_zyx_px = [int(nodule_bounding_box_coords_zyx_px[v]) if v%2==0
-                                                    else max(int(nodule_bounding_box_coords_zyx_px[v]), int(nodule_bounding_box_coords_zyx_px[v-1])+num_channels) for v in range(6)]
+                                                    else max(int(nodule_bounding_box_coords_zyx_px[v]+1), int(nodule_bounding_box_coords_zyx_px[v-1])+num_channels) for v in range(6)]
                     # get center_box_coords
                     nodule_center_box_coords_zyx_px = nodule["nodule_center_box_zmin/zmax_px_ymin/ymax_xmin/xmax"]
                     # ensure points within array
@@ -183,6 +186,7 @@ def generate_data_lsts(HU_tissue_range,
                             slices = center_slices
 
                         num_layers = slices.shape[2]
+
                         # for nodules with many layers split several parts from
                         nodules_pakets = []
                         if num_layers == num_channels:
@@ -195,6 +199,8 @@ def generate_data_lsts(HU_tissue_range,
                         for nodules_paket in nodules_pakets:
                             images.append(slices[:,:,min(nodules_paket):min(nodules_paket)+num_channels])
                             nodules_extract_coords_lst.append(nodule_box_coords)
+                            num_nodule_pakets_lst.append(len(nodules_pakets))
+                            nodule_id_lst.append(nodule['nodule_id'])
             # get some negative samples for every view_plane
             rand_layers_z = np.random.permutation(range(scan.shape[0]))
             rand_layers_y = np.random.permutation(range(scan.shape[1]))
@@ -268,7 +274,7 @@ def generate_data_lsts(HU_tissue_range,
                 if rand_layer_cnt == min(len(rand_layers_z), len(rand_layers_y), len(rand_layers_x)): break
 
             # loop over all images and labels sprang out from nodule
-            cropped_images_lsts = {'nodules': [images, nodules_extract_coords_lst], 'nodule_free': [images_nodule_free, [None]*len(images_nodule_free)]}
+            cropped_images_lsts = {'nodules': [images, nodules_extract_coords_lst, num_nodule_pakets_lst, nodule_id_lst], 'nodule_free': [images_nodule_free, [None]*len(images_nodule_free), [1]*len(images_nodule_free), [-1]*len(images_nodule_free)]}
             for cropped_images_lst_key in cropped_images_lsts.keys():
                 zipped_lsts = cropped_images_lsts[cropped_images_lst_key]
                 # loop over all pakets in images,..
@@ -276,6 +282,8 @@ def generate_data_lsts(HU_tissue_range,
                     org_img = zipped_lsts[0][img_cnt][:,:,:,:1]
                     org_lab = zipped_lsts[0][img_cnt][:,:,:,1:3]
                     nodule_box_coords_in_extract = zipped_lsts[1][img_cnt]
+                    num_nodule_pakets = zipped_lsts[2][img_cnt]
+                    nodule_id = zipped_lsts[3][img_cnt]
                     img = np.zeros(crop_size+[num_channels]+[1], dtype=np.uint8)
                     lab = np.zeros(crop_size+[1]+[2], dtype=np.uint8) # first channel ist label to predict, second channel for drawing center
                     # crop or pad org_img
@@ -332,9 +340,11 @@ def generate_data_lsts(HU_tissue_range,
                     stacked_data[:,:,:img.shape[-1],:1]  = img.copy()
                     stacked_data[:,:,:lab.shape[-1],1:3] = lab.copy()
                     all_data.append(stacked_data.copy())
-                    out_lst.write('{}\t{}\t{}\t{}\n'.format(num_data, patient, num_patient_data, 1 if cropped_images_lst_key=='nodules' else 0))
+                    # write info to out_lst
+                    out_lst.write('{}\t{}\t{}\t{}\t{}\t{}\n'.format(num_data, patient, nodule_id, patient_slice_num, 1 if cropped_images_lst_key=='nodules' else 0, num_nodule_pakets))
                     num_data += 1
-                    num_patient_data += 1
+                    patient_slice_num += 1
+
                     # if 0 and cropped_images_lst_key=='nodules':
                     #     randy = np.random.randint(0,10000)
                     #     cv2.imwrite('test_imgs/'+str(randy)+'_img.jpg', stacked_data[:,:,stacked_data.shape[2]//2,0])
@@ -347,3 +357,15 @@ def generate_data_lsts(HU_tissue_range,
     pipe.log.info('{} num data: {}'.format(lst_type, num_data))
     print ('saving npy-construct')
     out_path = pipe.save_array(basename=lst_type+'.npy' , array=np.array(all_data, dtype=np.uint8), step_name='gen_nodule_seg_data')
+
+    # load list and save again with headers
+    out_lst = pd.read_csv(lst_out_path, header=None, sep='\t')
+    out_lst = out_lst.rename(columns={0:'ongoing_num',1:'id', 2:'nodule_id', 3:'patient_slice_num', 4:'is_nodule', 5:'num_nodule_pakets'})
+    # calculate num_nodule_compensation_factor based on biggest nodule
+    out_lst['compensation_factor'] = np.max(out_lst['num_nodule_pakets'].values.tolist())/out_lst['num_nodule_pakets']
+    # negatives compensation_factor set to zero
+    out_lst['compensation_factor'].loc[out_lst['is_nodule']==0] = 1
+    print ('maximal compensation_factor', np.max(out_lst['compensation_factor'].values))
+    # save
+    out_lst.to_csv('/'.join(lst_out_path.split('/')[:-1])+ '/' + lst_out_path.split('/')[-1].split('.')[0]+'_DF.csv', index=False,sep='\t')
+

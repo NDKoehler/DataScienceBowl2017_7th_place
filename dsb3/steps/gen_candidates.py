@@ -13,11 +13,14 @@ from .. import utils
 sort_clusters_by = 'prob_sum_min_nodule_size'
 
 def run(n_candidates,
+        ensemble_foldername_of_prob_maps,
         threshold_prob_map,
         cube_shape,
         all_patients):
     resample_lungs_json = pipe.load_json('out.json', 'resample_lungs')
-    gen_prob_maps_json = pipe.load_json('out.json', 'gen_prob_maps')
+    if not ensemble_foldername_of_prob_maps:
+        ensemble_foldername_of_prob_maps = 'gen_rpbo_maps'
+    gen_prob_maps_json  = pipe.load_json('out.json', ensemble_foldername_of_prob_maps[0])
     gen_nodule_masks_json = None
     considered_patients = pipe.patients if all_patients else pipe.patients_by_split['va']
     if pipe.dataset_name == 'LUNA16':
@@ -27,9 +30,10 @@ def run(n_candidates,
                                                                     n_candidates,
                                                                     threshold_prob_map,
                                                                     cube_shape,
-                                                                    resample_lungs_json, 
+                                                                    resample_lungs_json,
                                                                     gen_prob_maps_json,
-                                                                    gen_nodule_masks_json)
+                                                                    gen_nodule_masks_json,
+                                                                    ensemble_foldername_of_prob_maps)
                                            for patient in considered_patients))
     # write both patients and candidates list
     patients_lst_path = pipe.get_step_dir() + 'patients.lst'
@@ -60,8 +64,17 @@ def process_patient(patient,
                     cube_shape,
                     resample_lungs_json,
                     gen_prob_maps_json,
-                    gen_nodule_masks_json):
-    prob_map = pipe.load_array(gen_prob_maps_json[patient]['basename'], 'gen_prob_maps')
+                    gen_nodule_masks_json,
+                    ensemble_foldername_of_prob_maps):
+    try:
+        prob_map = pipe.load_array(gen_prob_maps_json[patient]['basename'], ensemble_foldername_of_prob_maps[0]).astype(np.int16)
+        for folder_name in ensemble_foldername_of_prob_maps[1:]:
+            prob_map += pipe.load_array(gen_prob_maps_json[patient]['basename'], folder_name).astype(np.int16)
+        prob_map = (prob_map/len(ensemble_foldername_of_prob_maps)).astype(np.uint8)
+    except:
+        prob_map = pipe.load_array(gen_prob_maps_json[patient]['basename'], 'gen_prob_maps')
+        pipe.log.warning('colud not ensemble prob_maps for patient {}. only consider prob_map from gen_prob_maps and continue.'.format(patient))
+
     if prob_map.dtype == np.float32:
         prob_map = (255 * prob_map).astype(np.uint8)
     elif prob_map.dtype == np.uint16:

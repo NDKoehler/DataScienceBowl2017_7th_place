@@ -15,7 +15,7 @@ pipe = OrderedDict([
     }),
     #('write_basedir', '/media/juler/qnap/PROJECTS/dsb3/data_pipeline_gen2/'),
     #('write_basedir', '/media/juler/Data_0/dsb3/datapipelines/dsb3/'),
-    ('write_basedir', '/media/juler/Data_0/dsb3/datapipelines/LUNA16_TEST/'),
+    ('write_basedir', '/media/juler/Data_0/dsb3/datapipelines/LUNA16_0/'),
     #('write_basedir', '/home/juler/Projects/dsb3a/test/'),
 # data splits
     ('random_seed', 17),
@@ -54,28 +54,29 @@ gen_prob_maps = OrderedDict([
     ('batch_sizes',  [32, 32, 24, 24, 16, 16, 16, 16, 12, 12, 4, 1]),
     ('data_type', 'uint8'), # uint8, int16 or float32
     ('image_shape_max_ratio', 0.98),
-    ('checkpoint_dir', assets_path+'checkpoints/gen_prob_maps/no_ellips_03reduced_rad/'),
+    ('checkpoint_dir', assets_path+'checkpoints/gen_prob_maps/ellips_05reduced_rad_multiIDX_logloss_1classWeight_sliceCompensation_stagedIntensity'),
     ('all_patients', all_patients),
 ])
 gen_candidates = OrderedDict([
     ('n_candidates', 100),
-    ('threshold_prob_map', 0.2),
+    ('ensemble_foldername_of_prob_maps', ['gen_prob_maps_logloss','gen_prob_maps_logloss_stagedInten']), # False=gen_prob_maps else list of foldernames in datapipeline_directory
+    ('threshold_prob_map', 0.1),
     ('cube_shape', (32, 32, 32)), # ensure cube_edges are dividable by two -> improvement possible
     ('all_patients', all_patients),
 ])
 
 interpolate_candidates = OrderedDict([
-    ('n_candidates', 20),
+    ('n_candidates', 100),
     ('new_spacing_zyx', [0.5, 0.5, 0.5]), # y, x, z
     ('new_data_type', 'uint8'),
     ('new_candidates_shape_zyx', [64, 64, 64]),
-    ('crop_raw_scan_buffer', 10),
+    ('crop_raw_scan_buffer', 10), # hard code
 ])
 
 filter_candidates = OrderedDict([
     ('n_candidates', 20),
     ('checkpoint_dir', assets_path+'checkpoints/filter_candidates/rank_cross3/'),
-    ('num_augs_per_img', 3), # 1 means NO augmentation	
+    ('num_augs_per_img',1 ), # 1 means NO augmentation	
     ('all_patients', all_patients),
 ])
 

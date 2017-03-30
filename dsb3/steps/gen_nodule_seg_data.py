@@ -61,7 +61,6 @@ def run(view_angles,
                 view_planes,
                 num_negative_examples_per_nodule_free_patient_per_view_plane)
 
-
 def get_slice_from_zyx_array(array, slice_start, slice_end, axis):
     slice_start = max(0, slice_start)
     slice_end   = min(slice_end, array.shape[axis])
@@ -69,11 +68,11 @@ def get_slice_from_zyx_array(array, slice_start, slice_end, axis):
         print ('ERROR with slice_start, slice_end!!!')
         sys.exit()
     if axis == 0:
-        return np.swapaxes(array[slice_start:slice_end].copy(),0,2)
-    elif axis == 1:
-        return np.swapaxes(array[:, slice_start:slice_end].copy(), 1, 2)
+        return np.swapaxes(array[slice_start:slice_end].copy(),0,2) # z,y,x -> x,y,z # order equal to gen_prob_maps ordering
+    elif axis == 1: 
+        return np.swapaxes(array[:, slice_start:slice_end].copy(), 1, 2) #z,y,x, -> z,x,y
     elif axis == 2:
-        return array[:, :, slice_start:slice_end].copy()
+        return array[:, :, slice_start:slice_end].copy() #z,y,x
 
 def ensure_point_lst_within_array(lst, array_shape):
     return [int(np.clip(x, 0, array_shape)) for x in lst]

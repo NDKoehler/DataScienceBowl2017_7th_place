@@ -18,11 +18,11 @@ def run(n_candidates,
         cube_shape,
         all_patients):
     resample_lungs_json = pipe.load_json('out.json', 'resample_lungs')
-    if not ensemble_foldername_of_prob_maps:
-        ensemble_foldername_of_prob_maps = 'gen_rpbo_maps'
     gen_prob_maps_json  = pipe.load_json('out.json', ensemble_foldername_of_prob_maps[0])
     gen_nodule_masks_json = None
     considered_patients = pipe.patients if all_patients else pipe.patients_by_split['va']
+    if not ensemble_foldername_of_prob_maps:
+        ensemble_foldername_of_prob_maps = ['gen_prob_maps']
     if pipe.dataset_name == 'LUNA16':
         gen_nodule_masks_json = pipe.load_json('out.json', 'gen_nodule_masks')
     patients_candidates_json = OrderedDict(Parallel(n_jobs=min(pipe.n_CPUs, len(considered_patients)), verbose=100)(

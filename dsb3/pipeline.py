@@ -29,6 +29,7 @@ avail_steps = OrderedDict([
     ('6', 'gen_nodule_seg_data'),
     ('7', 'gen_submission'),
     ('8', 'include_nodule_distr'),
+    ('9', 'pred_cancer_per_candidate'),
 ])
 
 avail_runs = OrderedDict([])
@@ -333,7 +334,7 @@ def _init_patients_by_split(tr_va_ho_split, tr_va_ho_split_file=None):
         raise ValueError('tr_va_ho_split has to sum to one!')
     global patients_by_split
     filename = get_write_dir() + 'patients_by_split.json'
-    filename_assets = '../dsb3a_assets/patients_lsts/' + dataset_name + '/json_95/patients_by_split.json'
+    filename_assets = '../dsb3a_assets/patients_lsts/' + dataset_name + '/json/patients_by_split.json'
     if os.path.exists(filename_assets):
         patients_by_split = json.load(open(filename_assets), object_pairs_hook=OrderedDict)
         print('reading splits from', filename_assets)

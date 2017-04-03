@@ -16,10 +16,10 @@ pipe = OrderedDict([
     ('write_basedir', '/home/alex_wolf/data/170327'),
 # data splits
     ('random_seed', 17),
-    ('tr_va_ho_split', [0.8, 0.2, 0]), # something like 0.15, 0.7, 0.15
+    ('tr_va_ho_split', [0.95, 0.05, 0]), # something like 0.15, 0.7, 0.15
 # technical parameters
-    ('n_CPUs', 5),
-    ('GPU_ids', [0]),
+    ('n_CPUs', 8),
+    ('GPU_ids', [1]),
     ('GPU_memory_fraction', 0.85),
 ])
 
@@ -54,18 +54,21 @@ gen_prob_maps = OrderedDict([
     ('image_shape_max_ratio', 0.95),
     ('all_patients', all_patients),
     # ('checkpoint_dir', checkpoints_dir + 'gen_prob_maps/nodule_seg_1mm_128x128_5Channels_multiview'),
-    ('checkpoint_dir', checkpoints_dir + 'gen_prob_maps/nodule_seg_gen6'),
+    # ('checkpoint_dir', checkpoints_dir + 'gen_prob_maps/nodule_seg_gen6'),
+    # ('checkpoint_dir', checkpoints_dir + 'gen_prob_maps/ellips_05reduced_rad_LOGLOSS_1classWeight_sliceCompensation_95_stagedIntensitiesFalse'),
+    ('checkpoint_dir', checkpoints_dir + 'gen_prob_maps/noellips_05reduced_rad_LOGLOSS_1classWeight_sliceCompensation_95_stagedIntensitiesTrue'),
 ])
 
 gen_candidates = OrderedDict([
     ('n_candidates', 20),
+    ('ensemble_foldername_of_prob_maps', ['gen_prob_maps']), # ['gen_prob_maps_net1', 'gen_prob_maps_net2', 'gen_prob_maps_net3']), # ['gen_prob_maps_logloss','gen_prob_maps_logloss_stagedInten']), # False=gen_prob_maps else list of foldernames in datapipeline_directory
     ('threshold_prob_map', 0.2),
     ('cube_shape', (32, 32, 32)), # ensure cube_edges are dividable by two -> improvement possible
     ('all_patients', all_patients),
 ])
 
 interpolate_candidates = OrderedDict([
-    ('n_candidates', 20),
+    ('n_candidates', 5),
     ('new_spacing_zyx', [0.5, 0.5, 0.5]), # y, x, z
     ('new_data_type', 'float32'),
     ('new_candidates_shape_zyx', [64, 64, 64]),
@@ -73,7 +76,17 @@ interpolate_candidates = OrderedDict([
 ])
 
 filter_candidates = OrderedDict([
-    ('checkpoint_dir', checkpoints_dir + 'filter_candidates/cross_crop_retrain_further'),
+    ('n_candidates', 20),
+    ('checkpoint_dir', assets_dir + 'checkpoints/filter_candidates/rank_cross3/'),
+    ('num_augs_per_img',1 ), # 1 means NO augmentation	
+    ('all_patients', all_patients),
+])
+
+pred_cancer_per_candidate = OrderedDict([
+    ('n_candidates', 20),
+    ('checkpoint_dir', assets_dir + 'checkpoints/pred_cancer_per_candidate/cross_3cands_720epochs/'),
+    ('num_augs_per_img', 1), # 1 means NO augmentation	
+    ('all_patients', all_patients),
 ])
 
 gen_submission = OrderedDict([
@@ -85,11 +98,11 @@ gen_submission = OrderedDict([
 ])
 
 include_nodule_distr = OrderedDict([
-    ('n_candidates', 20), 
-    ('bin_size', 0.05), 
-    ('kernel_width', 0.2), 
-    ('xg_max_depth', 2), 
-    ('xg_eta', 1), 
+    ('n_candidates', 5),
+    ('bin_size', 0.05),
+    ('kernel_width', 0.2),
+    ('xg_max_depth', 2),
+    ('xg_eta', 1),
     ('xg_num_round', 2)
 ])
 
@@ -100,11 +113,11 @@ include_nodule_distr = OrderedDict([
 gen_nodule_masks = OrderedDict([
     ('ellipse_mode', False),
     ('reduced_mask_radius_fraction', 0.5),
-    ('mask2pred_lower_radius_limit_px', 3),
-    ('mask2pred_upper_radius_limit_px', 15),
+    ('mask2pred_lower_radius_limit_px', 5),
+    ('mask2pred_upper_radius_limit_px', 20),
     ('LUNA16_annotations_csv_path', '../dsb3a_assets/LIDC-annotations_2_nodule-seg_annotations/annotations_min+missing_LUNA16_patients.csv'),
-    ('yx_buffer_px', 1),
-    ('z_buffer_px', 2),
+    ('yx_buffer_px', 0),
+    ('z_buffer_px', 0),
 ])
 
 gen_nodule_seg_data = OrderedDict([

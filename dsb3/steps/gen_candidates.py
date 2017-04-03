@@ -78,7 +78,9 @@ def process_patient(patient,
     if prob_map.dtype == np.float32:
         prob_map = (255 * prob_map).astype(np.uint8)
     elif prob_map.dtype == np.uint16:
-        raise ValueError('Data type unit16 for prob_map not implemented in gen_candidates.')
+        raise ValueError('Data type uint16 for prob_map not implemented in gen_candidates.')
+    prob_map_avg = np.sum(prob_map) / 255 / prob_map.size
+
     prob_map_thresh = prob_map.copy()
     prob_map_thresh[prob_map_thresh < threshold_prob_map * 255] = 0.0 # here prob_map is in units of 255
     # the points in mm units, relative to dummy origin in pixels
@@ -144,6 +146,7 @@ def process_patient(patient,
                 if not nodule_is_contained:
                     non_detected_nodules.append(nodule_cnt)                
         patient_json['label'] = count_nodules_prio_greater_2 > 0
+    patient_json['prob_map_avg'] = prob_map_avg
     patient_json['clusters'] = [] # this stores all the information about the candidates
     patient_json['candidates_lst'] = [] # this is a sorted list of candidates
     can_img_paths = []; can_prob_map_paths = []

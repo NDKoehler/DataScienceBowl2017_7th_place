@@ -95,7 +95,7 @@ def process_nodule_patient(patient, annotations, resample_lungs_json,
         nodule_json['old_diameter_mm'] = float(old_diameter_mm)
         patient_json['nodules'].append(nodule_json)
         # show the center of the annotation
-        for crop in [False, True]:
+        for crop in []: # [False, True]:
             color = 'r' if nodule_json['nodule_priority'] >= 3 else 'orange' if nodule_json['nodule_priority'] == 2 else 'green'
             level = 255 if nodule_json['nodule_priority'] >= 3 else 170 if nodule_json['nodule_priority'] == 2 else 85
             if crop:

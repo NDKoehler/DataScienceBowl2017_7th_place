@@ -249,4 +249,4 @@ class cancer_score():
             l = logloss(predictions, 1 if lab>0 else 0)
             return self.all_predictions, l
         else:
-            return self.all_prediction
+            return self.all_predictions

@@ -124,7 +124,7 @@ def run(splitting,
     # mean over all predictions and save submission csv
     for pa_cnt, patient in tqdm(enumerate(patients_2_process)):
         if splitting == 'submission':
-                sample_submission[sample_submission['id'] == patient]['cancer'] = np.mean(patients_predictions[pa_cnt])
+                sample_submission['cancer'][sample_submission['id'] == patient] = np.mean(patients_predictions[pa_cnt])
     # save submission to submission dir
     if splitting == 'submission':
         submission_path = pipe.get_step_dir() + 'submission.csv'

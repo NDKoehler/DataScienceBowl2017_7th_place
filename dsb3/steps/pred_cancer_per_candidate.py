@@ -37,7 +37,8 @@ def run(num_augs_per_img,
     else:
         splits = ['va']
     for lst_type in splits:
-        patients_DF_path = pipe.get_step_dir('interpolate_candidates') + lst_type + '_patients.lst'
+        #patients_DF_path = pipe.get_step_dir('interpolate_candidates') + lst_type + '_patients.lst'
+        patients_DF_path = '/media/juler/Data_0/dsb3/datapipelines/dsb3_0/dsb3_0/interpolate_candidates_gold/va_correct_split.lst'
         if os.path.exists(patients_DF_path):
             try:
                 patients_DF = pd.read_csv(patients_DF_path, sep = '\t', header=None)
@@ -64,7 +65,7 @@ def run(num_augs_per_img,
             out_clusters_json = out_patient_json['clusters']
             num_real_candidates = len(clusters_json)
             # get patients interpolated candidates
-            all_candidates = pipe.load_array(patient+'.npy', 'interpolate_candidates')[:num_real_candidates]
+            all_candidates = pipe.load_array(patient+'.npy', 'interpolate_candidates_gold')[:num_real_candidates]
             # get candidates labels
             # get all candidates scores
             all_candidates_scores = []
@@ -148,6 +149,7 @@ class score_nodules():
                     break
                 self.batch[cnt] = self.pred_iter.AugmentData(candidate.copy())
             predictions = self.sess.run(self.pred_ops, feed_dict = {self.data['images']: self.batch})['probs']
+            print (predictions)
             self.cand_predictions[b_cnt*self.batch_size:min(self.num_augs_per_img,(b_cnt+1)*self.batch_size)] = \
                            predictions[:min(self.num_augs_per_img,
                                         (b_cnt+1)*self.batch_size)-b_cnt*self.batch_size, 0]

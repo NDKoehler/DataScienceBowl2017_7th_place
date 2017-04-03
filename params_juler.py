@@ -22,15 +22,15 @@ pipe = OrderedDict([
                        # tr  va   ho
     ('tr_va_ho_split', [0.80, 0.20, 0]), # something like 0.15, 0.7, 0.15
 # technical parameters
-    ('n_CPUs', 6),
+    ('n_CPUs', 3),
     ('GPU_ids', [0]),
-    ('GPU_memory_fraction', 0.85),
+    ('GPU_memory_fraction', 0.8),
 ])
 
 # ------------------------------------------------------------------------------
 # step parameters
 # ------------------------------------------------------------------------------
-all_patients = True
+all_patients = False
 assets_path = '../dsb3a_assets/'
 
 resample_lungs = OrderedDict([
@@ -80,12 +80,29 @@ filter_candidates = OrderedDict([
     ('all_patients', all_patients),
 ])
 
+pred_cancer_per_candidate = OrderedDict([
+    ('n_candidates', 20),
+#    ('checkpoint_dir', assets_dir + 'checkpoints/pred_cancer_per_candidate/cross_3cands_720epochs/'),
+    ('checkpoint_dir', assets_path + 'checkpoints/pred_cancer_per_candidate/gold_cross_1randCand_410epochs/'),
+    ('num_augs_per_img', 1), # 1 means NO augmentation	
+    ('all_patients', all_patients),
+])
+
 gen_submission = OrderedDict([
     ('splitting', 'validation'), # 'validation' or 'submission' or 'holdout'<-not implemented yet
     ('checkpoint_dir', assets_path+'checkpoints/gen_submission/cross_crop_retrain_further'),
     ('patients_lst_path', 'filter_candidates'), # if False->filter_candidates; if 'interpolate_candidates'->lst and arrays from current dataset is used
     ('num_augs_per_img', 5),
     ('sample_submission_lst_path', '../raw_data/dsb3/stage1_sample_submission.csv'),
+])
+
+include_nodule_distr = OrderedDict([
+    ('n_candidates', 5),
+    ('bin_size', 0.05),
+    ('kernel_width', 0.2),
+    ('xg_max_depth', 2),
+    ('xg_eta', 1),
+    ('xg_num_round', 2)
 ])
 
 # ------------------------------------------------------------------------------

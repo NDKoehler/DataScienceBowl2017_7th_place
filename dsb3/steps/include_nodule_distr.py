@@ -10,7 +10,8 @@ from .. import pipeline as pipe
 
 def run(n_candidates=20, bin_size=0.05, kernel_width=0.2, xg_max_depth=2, xg_eta=1, xg_num_round=2):
     resample_lungs_out = pipe.load_json('out.json', 'resample_lungs')
-    gen_candidates_out = pipe.load_json('out.json', 'gen_candidates')
+    gen_candidates_out = pipe.load_json('out.json', 'pred_cancer_per_candidate')
+    # gen_candidates_out = pipe.load_json('out.json', 'gen_candidates')
 
     n_pairs = int(n_candidates * (n_candidates-1)/2)
     patients = []
@@ -33,6 +34,7 @@ def run(n_candidates=20, bin_size=0.05, kernel_width=0.2, xg_max_depth=2, xg_eta
             positions.append(cluster['center_px'])
             weights.append(cluster['prob_sum_cluster'])
             # weights.append(cluster['prob_sum_min_nodule_size'])
+            # weights.append(cluster['nodule_score'])
         if not positions:
             positions = [[0, 0, 0]]
             weights = [0]

@@ -17,6 +17,7 @@ def run(n_candidates=20, bin_size=0.05, kernel_width=0.2, xg_max_depth=2, xg_eta
     patients = []
     labels = []
     nodule_weights = []
+    nodule_sizes = []
     nodule_dists_mutual = []
     nodule_dists_evalues = []
     nodule_dists_from_lung = []
@@ -26,24 +27,32 @@ def run(n_candidates=20, bin_size=0.05, kernel_width=0.2, xg_max_depth=2, xg_eta
         # cancer label
         labels.append(patient_json['label'])
         # prob map sum
-        prob_maps_avg.append(patient_json['prob_map_avg'])
+        # prob_maps_avg.append(patient_json['prob_map_avg'])
         # nodule info
         positions = []
         weights = []
+        sizes = []
         for cluster in patient_json['clusters'][:n_candidates]:
             positions.append(cluster['center_px'])
-            weights.append(cluster['prob_sum_cluster'])
+            # weights.append(cluster['prob_sum_cluster'])
+            weights.append(cluster['nodule_score'])
             # weights.append(cluster['prob_sum_min_nodule_size'])
-            # weights.append(cluster['nodule_score'])
+            # sizes.append(cluster['size_points_cluster'])
         if not positions:
             positions = [[0, 0, 0]]
             weights = [0]
         # nodule weights
-        weights = np.array(sorted(weights, reverse=True)) # high-weight nodules to the front
+        sort_idx = np.argsort(weights)[::-1]
+        weights = np.array(weights)[sort_idx] # high-weight nodules to the front
         if weights.shape[0] < n_candidates: # fill up the last places with zeros NOTE that filling up the first places lead to a better result, but is inconsistent
             weights = np.concatenate((weights, np.zeros(n_candidates - weights.shape[0])))
         # weights = np.histogram(weights, bins=np.arange(0, 1 + bin_size, bin_size))[0]
         nodule_weights.append(weights)
+        # nodule sizes
+        # sizes = np.array(sizes)[sort_idx]
+        # if sizes.shape[0] < n_candidates: # fill up the last places with zeros NOTE that filling up the first places lead to a better result, but is inconsistent
+        #     sizes = np.concatenate((sizes, np.zeros(n_candidates - sizes.shape[0])))
+        # nodule_sizes.append(sizes)
         # nodule positions
         # positions = np.array(positions)
         # lung_shape = np.array(resample_lungs_out[patient]['resampled_scan_shape_zyx_px'])
@@ -65,6 +74,7 @@ def run(n_candidates=20, bin_size=0.05, kernel_width=0.2, xg_max_depth=2, xg_eta
     patients = np.array(patients)
     labels = np.array(labels)
     nodule_weights = np.array(nodule_weights)
+    nodule_sizes = np.array(nodule_sizes)
     nodule_dists_mutual = np.array(nodule_dists_mutual)
     nodule_dists_from_lung = np.array(nodule_dists_from_lung)
     nodule_dists_evalues = np.array(nodule_dists_evalues)
@@ -73,9 +83,10 @@ def run(n_candidates=20, bin_size=0.05, kernel_width=0.2, xg_max_depth=2, xg_eta
     # X = np.concatenate((nodule_weights, nodule_dists_from_lung, nodule_dists_mutual, nodule_dists_evalues), axis=1)
     # X = np.concatenate((nodule_weights, nodule_dists_evalues), axis=1)
     # X = nodule_dists_evalues
-    # X = nodule_weights[:, 0][:, None]
+    X = nodule_weights[:, :n_candidates]
     # X = prob_maps_avg[:, None]
-    X = np.concatenate((nodule_weights[:, 0][:, None], prob_maps_avg[:, None]), axis=1)
+    # X = np.concatenate((nodule_weights[:, :1], prob_maps_avg[:, None]), axis=1)
+    # X = nodule_sizes[:, :1]
     # X = nodule_dists_from_lung
 
     # filename_assets = '../dsb3a_assets/patients_lsts/' + pipe.dataset_name + '/json/patients_by_split.json'

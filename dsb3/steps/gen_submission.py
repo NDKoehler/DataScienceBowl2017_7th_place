@@ -42,7 +42,7 @@ def run(splitting,
     # get patiens data from within pipe/ called folder /arrays.*.npy
     if patients_lst_path == 'filter_candidates' or \
          patients_lst_path == 'interpolate_candidates':
-                va_lst_path = pipe.get_step_dir('interpolate_candidates') + 'tr_patients.lst' ################### va_p
+                va_lst_path = pipe.get_step_dir(patients_lst_path) + 'va_patients.lst' if splitting=='validation' else 'ho_patients.lst'
                 data_from_wihtin_pipe = 'fc' if patients_lst_path=='filter_candidates' else 'ic'
     else:
         # if not path column in called list is used
@@ -54,7 +54,7 @@ def run(splitting,
         sample_submission = pd.read_csv(sample_submission_lst_path) # header: id, cancer
         patients_2_process = sample_submission['id'].values.tolist()
     elif splitting == 'validation':
-        validation_DF = pd.read_csv(va_lst_path, header=None, sep='\t')
+        validation_DF = pd.read_csv(patients_lst_path, header=None, sep='\t')
         validation_DF = validation_DF.rename(columns={0:'id',1:'cancer_label',2:'path'})
         patients_2_process = validation_DF['id'].values.tolist()
     patients_2_process = list(set(patients_2_process))

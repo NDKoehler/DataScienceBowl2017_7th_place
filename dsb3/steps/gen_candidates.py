@@ -10,7 +10,7 @@ from .. import pipeline as pipe
 from .. import utils
 
 # rank the candidatess / clusters according to the following score
-sort_clusters_by = 'prob_sum_min_nodule_size'
+sort_clusters_by = 'prob_sum_min_nodule_size' #prob_sum_min_nodule_size # prob_sum_cluster
 
 def run(n_candidates,
         ensemble_foldername_of_prob_maps,

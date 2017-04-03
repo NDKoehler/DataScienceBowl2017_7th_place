@@ -7,7 +7,7 @@ from collections import OrderedDict
 pipe = OrderedDict([
     ('n_patients', 0), # number of patients to process, 0 means all
 # dataset origin and paths
-    ('dataset_name', 'LUNA16'), # 'LUNA16' or 'dsb3'
+    ('dataset_name', 'dsb3'), # 'LUNA16' or 'dsb3'
     ('raw_data_dirs', {
         'LUNA16': '/media/juler/Data_0/dsb3/raw_data/LUNA16/',
         'dsb3': '/media/juler/Data_0/dsb3/raw_data/dsb3/stage1/',
@@ -15,14 +15,14 @@ pipe = OrderedDict([
     }),
     #('write_basedir', '/media/juler/qnap/PROJECTS/dsb3/data_pipeline_gen2/'),
     #('write_basedir', '/media/juler/Data_0/dsb3/datapipelines/dsb3/'),
-    ('write_basedir', '/media/juler/Data_0/dsb3/datapipelines/LUNA16_0/'),
+    ('write_basedir', '/media/juler/Data_0/dsb3/datapipelines/dsb3_0/'),
     #('write_basedir', '/home/juler/Projects/dsb3a/test/'),
 # data splits
     ('random_seed', 17),
                        # tr  va   ho
-    ('tr_va_ho_split', [0.8, 0.2, 0]), # something like 0.15, 0.7, 0.15
+    ('tr_va_ho_split', [0.80, 0.20, 0]), # something like 0.15, 0.7, 0.15
 # technical parameters
-    ('n_CPUs', 7),
+    ('n_CPUs', 6),
     ('GPU_ids', [0]),
     ('GPU_memory_fraction', 0.85),
 ])
@@ -30,7 +30,7 @@ pipe = OrderedDict([
 # ------------------------------------------------------------------------------
 # step parameters
 # ------------------------------------------------------------------------------
-all_patients = False
+all_patients = True
 assets_path = '../dsb3a_assets/'
 
 resample_lungs = OrderedDict([
@@ -53,20 +53,20 @@ gen_prob_maps = OrderedDict([
                      # valid shape numbers: 256, 304, 320, 352, 384, 400, 416, 448, 464, 480, 496, 512 (dividable by 16)
     ('batch_sizes',  [32, 32, 24, 24, 16, 16, 16, 16, 12, 12, 4, 1]),
     ('data_type', 'uint8'), # uint8, int16 or float32
-    ('image_shape_max_ratio', 0.98),
-    ('checkpoint_dir', assets_path+'checkpoints/gen_prob_maps/ellips_05reduced_rad_multiIDX_logloss_1classWeight_sliceCompensation_stagedIntensity'),
+    ('image_shape_max_ratio', 0.95),
+    ('checkpoint_dir', assets_path+'checkpoints/gen_prob_maps/FINETUNE_MSE5Ch_multiView_minPrio3'),
     ('all_patients', all_patients),
 ])
 gen_candidates = OrderedDict([
-    ('n_candidates', 100),
-    ('ensemble_foldername_of_prob_maps', ['gen_prob_maps_logloss','gen_prob_maps_logloss_stagedInten']), # False=gen_prob_maps else list of foldernames in datapipeline_directory
-    ('threshold_prob_map', 0.1),
+    ('n_candidates', 20),
+    ('ensemble_foldername_of_prob_maps', ['gen_prob_maps_NET3', 'gen_prob_maps_gold']), # False=gen_prob_maps else list of foldernames in datapipeline_directory
+    ('threshold_prob_map', 0.2),
     ('cube_shape', (32, 32, 32)), # ensure cube_edges are dividable by two -> improvement possible
     ('all_patients', all_patients),
 ])
 
 interpolate_candidates = OrderedDict([
-    ('n_candidates', 100),
+    ('n_candidates', 20),
     ('new_spacing_zyx', [0.5, 0.5, 0.5]), # y, x, z
     ('new_data_type', 'uint8'),
     ('new_candidates_shape_zyx', [64, 64, 64]),
@@ -105,11 +105,11 @@ gen_nodule_masks = OrderedDict([
 gen_nodule_seg_data = OrderedDict([
     ('view_angles', [0]), # per view_plane (degree)
     ('extra_radius_buffer_px', 15),
-    ('num_channels', 1),
-    ('stride', 1),
-    ('crop_size', [96, 96]),
+    ('num_channels', 5),
+    ('stride', 2),
+    ('crop_size', [128, 128]),
     ('view_planes', 'yxz'), 
-    ('num_negative_examples_per_nodule_free_patient_per_view_plane', 40),
+    ('num_negative_examples_per_nodule_free_patient_per_view_plane', 15),
     ('HU_tissue_range', [-1000, 400]), # MIN_BOUND, MAX_BOUND [-1000, 400]
 ])
 
@@ -119,7 +119,7 @@ gen_nodule_seg_data = OrderedDict([
 # ------------------------------------------------------------------------------
 
 gen_candidates_eval = OrderedDict([
-    ('max_n_candidates', 20),
+    ('max_n_candidates', 100),
     ('max_dist_fraction', 0.5),
     ('priority_threshold', 3), 
     ('sort_candidates_by', 'prob_sum_min_nodule_size'),#'prob_sum_min_nodule_size', 'nodule_score'),

@@ -333,11 +333,14 @@ def _init_patients_by_split(tr_va_ho_split, tr_va_ho_split_file=None):
     if sum(tr_va_ho_split) != 1:
         raise ValueError('tr_va_ho_split has to sum to one!')
     global patients_by_split
-    filename = get_write_dir() + 'patients_by_split.json'
-    filename_assets = '../dsb3a_assets/patients_lsts/' + dataset_name + '/json/patients_by_split.json'
-    if os.path.exists(filename_assets):
-        patients_by_split = json.load(open(filename_assets), object_pairs_hook=OrderedDict)
-        print('reading splits from', filename_assets)
+    #filename = get_write_dir() + 'patients_by_split.json'
+    
+    filename = '../dsb3a_assets/patients_lsts/' + dataset_name + '/json_' + str(int(tr_va_ho_split[0]*100)) + '/patients_by_split.json'
+
+    if os.path.exists(filename):
+        patients_by_split = json.load(open(filename), object_pairs_hook=OrderedDict)
+        print('reading split from', filename)
+
     else:
         patients_by_label_split = {}
         for label in [1, 0]:

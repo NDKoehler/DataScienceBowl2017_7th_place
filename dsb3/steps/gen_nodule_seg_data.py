@@ -333,11 +333,12 @@ def generate_data_lsts(HU_tissue_range,
                                 org_coords.append(org_img.shape[idx])
                     img_coords = [int(x) for x in img_coords]
                     org_coords = [int(x) for x in org_coords]
+
                     img[img_coords[0]:img_coords[1], img_coords[2]:img_coords[3], :] = org_img[org_coords[0]:org_coords[1], org_coords[2]:org_coords[3]].copy()
-                    lab[img_coords[0]:img_coords[1], img_coords[2]:img_coords[3], :] = org_lab[org_coords[0]:org_coords[1], org_coords[2]:org_coords[3]].copy()
+                    lab[img_coords[0]:img_coords[1], img_coords[2]:img_coords[3], :] = org_lab[org_coords[0]:org_coords[1], org_coords[2]:org_coords[3], org_lab.shape[2]//2-num_channels//2:org_lab.shape[2]//2-num_channels//2+num_channels].copy()
                     # stack img and lab and include in all_data lst
-                    stacked_data[:,:,:img.shape[-1],:1]  = img.copy()
-                    stacked_data[:,:,:lab.shape[-1],1:3] = lab.copy()
+                    stacked_data[:,:,:img.shape[-2],:1]  = img.copy()
+                    stacked_data[:,:,:lab.shape[-2],1:3] = lab.copy()
                     all_data.append(stacked_data.copy())
                     # write info to out_lst
                     out_lst.write('{}\t{}\t{}\t{}\t{}\t{}\n'.format(num_data, patient, nodule_id, patient_slice_num, 1 if cropped_images_lst_key=='nodules' else 0, num_nodule_pakets))

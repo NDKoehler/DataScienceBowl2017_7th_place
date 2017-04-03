@@ -132,13 +132,16 @@ def gen_data(lst_type,
             if pipe.dataset_name == 'LUNA16':
                 with open(pipe.get_step_dir() + lst_type + '_candidates.lst', 'a') as f:
                     for cnt in range(images.shape[0]):
-                        cand = img_lst_candidates[0][cand_line_num]
-                        cand_label = img_lst_candidates[1][cand_line_num]
+                        cand = patient+'_'+str(cnt)
+                        img_lst_candidates[img_lst_candidates[0]==cand][1].values.tolist()
+                        cand_label = img_lst_candidates[img_lst_candidates[0]==cand][1].values.tolist()
+                        if len(cand_label)==0:
+                            cand_label=0
+                        else:
+                            cand_label=cand_label[0]
                         if not cand.startswith(patient):
                             raise ValueError(cand + ' needs to start with ' + patient)
                         f.write('{}\t{}\t{}\n'.format(cand, cand_label, path))
-                        cand_line_num += 1
-            cand_line_num += n_candidates_gen - n_candidates
 
 def gen_patients_candidates(line_num,
                             img_lst_patients,

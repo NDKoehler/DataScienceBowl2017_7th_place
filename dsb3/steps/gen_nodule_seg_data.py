@@ -335,7 +335,7 @@ def generate_data_lsts(HU_tissue_range,
                     org_coords = [int(x) for x in org_coords]
 
                     img[img_coords[0]:img_coords[1], img_coords[2]:img_coords[3], :] = org_img[org_coords[0]:org_coords[1], org_coords[2]:org_coords[3]].copy()
-                    lab[img_coords[0]:img_coords[1], img_coords[2]:img_coords[3], :] = org_lab[org_coords[0]:org_coords[1], org_coords[2]:org_coords[3], org_lab.shape[2]//2-num_channels//2:org_lab.shape[2]//2-num_channels//2+num_channels].copy()
+                    lab[img_coords[0]:img_coords[1], img_coords[2]:img_coords[3], 0] = org_lab[org_coords[0]:org_coords[1], org_coords[2]:org_coords[3], org_lab.shape[2]//2].copy()
                     # stack img and lab and include in all_data lst
                     stacked_data[:,:,:img.shape[-2],:1]  = img.copy()
                     stacked_data[:,:,:lab.shape[-2],1:3] = lab.copy()

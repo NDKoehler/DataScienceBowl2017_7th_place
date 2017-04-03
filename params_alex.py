@@ -16,7 +16,8 @@ pipe = OrderedDict([
     ('write_basedir', '/home/alex_wolf/data/170327'),
 # data splits
     ('random_seed', 17),
-    ('tr_va_ho_split', [0.95, 0.05, 0]), # something like 0.15, 0.7, 0.15
+    ('tr_va_ho_split', [0.8, 0.2, 0]),    
+    # ('tr_va_ho_split', [0.95, 0.05, 0]), # something like 0.15, 0.7, 0.15
 # technical parameters
     ('n_CPUs', 8),
     ('GPU_ids', [1]),
@@ -84,7 +85,8 @@ filter_candidates = OrderedDict([
 
 pred_cancer_per_candidate = OrderedDict([
     ('n_candidates', 20),
-    ('checkpoint_dir', assets_dir + 'checkpoints/pred_cancer_per_candidate/cross_3cands_720epochs/'),
+#    ('checkpoint_dir', assets_dir + 'checkpoints/pred_cancer_per_candidate/cross_3cands_720epochs/'),
+    ('checkpoint_dir', assets_dir + 'checkpoints/pred_cancer_per_candidate/gold_cross_1randCand_410epochs/'),
     ('num_augs_per_img', 1), # 1 means NO augmentation	
     ('all_patients', all_patients),
 ])

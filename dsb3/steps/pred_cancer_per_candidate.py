@@ -51,7 +51,7 @@ def run(num_augs_per_img,
             pipe.log.error('empty patient list {}'.format(lst_type))
             continue
         # initialize out_list
-        open(pipe.get_step_dir() + lst_type + '_candidates_filtered.lst', 'w').close()
+        open(pipe.get_step_dir() + lst_type + '_candidates.lst', 'w').close()
         # get scores for all candidates of each patient
         all_patient_losses = []
         for pa_cnt, patient in enumerate(tqdm(patients_DF[0].values.tolist())):
@@ -83,17 +83,13 @@ def run(num_augs_per_img,
             # extract candidates with highest scores
             out_candidates_idx = list(np.argsort(np.array(all_candidates_scores)).copy()[::-1])
             out_candidates_idx = out_candidates_idx[:n_candidates]
-            for idx_cnt, idx in enumerate(out_candidates_idx):
-                if idx_cnt==0:
-                    out_candidates = np.expand_dims(all_candidates[idx], axis=0)
-                else:
-                    out_candidates = np.vstack([out_candidates, np.expand_dims(all_candidates[idx], axis=0)])
             with open(pipe.get_step_dir() + lst_type + '_candidates.lst', 'a') as out_lst:
                 for idx_cnt, idx in enumerate(out_candidates_idx):
                     if idx_cnt < num_real_candidates:
                         nodule_score = all_candidates_scores[idx]
                         clusters_json[idx]['nodule_score'] = str(nodule_score)
                         out_clusters_json.append(clusters_json[idx])
+                        out_lst.write('{}\t{}\t{}\t{}\n'.format(patient + '_' + str(idx_cnt), patient_json['label'], 'dummy', str(nodule_score)))
         pipe.save_json('out.json', out_json)
 
 class score_nodules():

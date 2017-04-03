@@ -71,7 +71,7 @@ def run(n_candidates=20, bin_size=0.05, kernel_width=0.2, xg_max_depth=2, xg_eta
     # X = np.concatenate((nodule_weights, nodule_dists_from_lung, nodule_dists_mutual, nodule_dists_evalues), axis=1)
     # X = np.concatenate((nodule_weights, nodule_dists_evalues), axis=1)
     # X = nodule_dists_evalues
-    X = nodule_weights[:, 0][:, None]
+    # X = nodule_weights[:, 0][:, None]
     # X = prob_maps_avg[:, None]
     X = np.concatenate((nodule_weights[:, 0][:, None], prob_maps_avg[:, None]), axis=1)
     # X = nodule_dists_from_lung
@@ -123,25 +123,25 @@ def run(n_candidates=20, bin_size=0.05, kernel_width=0.2, xg_max_depth=2, xg_eta
     # plt.xlabel('patient in va set')
     # plt.savefig('logloss.png')
 
-    cancer_patients = set(pipe.patients_by_label[1])
-    X_cancer = []
-    X_nocancer = []
-    for i, patient in enumerate(patients):
-        if patient in cancer_patients:
-            plt.plot(X[i], c = 'red')
-            X_cancer.append(X[i, 0])
-        else:
-            plt.plot(X[i], c = 'green')
-            X_nocancer.append(X[i, 0])
-    plt.ylabel('weight')
-    plt.xlabel('candidate rank')
-    plt.savefig('weight_distr.png')
-    plt.figure()
-    import seaborn as sns
-    sns.distplot(X_cancer, label='cancer', color='red')
-    sns.distplot(X_nocancer, label='nocancer', color='green')
-    plt.savefig('weight_hist.png')
-    sns.plt.show()
+    # cancer_patients = set(pipe.patients_by_label[1])
+    # X_cancer = []
+    # X_nocancer = []
+    # for i, patient in enumerate(patients):
+    #     if patient in cancer_patients:
+    #         plt.plot(X[i], c = 'red')
+    #         X_cancer.append(X[i, 0])
+    #     else:
+    #         plt.plot(X[i], c = 'green')
+    #         X_nocancer.append(X[i, 0])
+    # plt.ylabel('weight')
+    # plt.xlabel('candidate rank')
+    # plt.savefig('weight_distr.png')
+    # plt.figure()
+    # import seaborn as sns
+    # sns.distplot(X_cancer, label='cancer', color='red')
+    # sns.distplot(X_nocancer, label='nocancer', color='green')
+    # plt.savefig('weight_hist.png')
+    # sns.plt.show()
 
     # using sklearn
     if False:

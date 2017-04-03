@@ -91,19 +91,9 @@ def run(num_augs_per_img,
             with open(pipe.get_step_dir() + lst_type + '_candidates.lst', 'a') as out_lst:
                 for idx_cnt, idx in enumerate(out_candidates_idx):
                     if idx_cnt < num_real_candidates:
-                        if pipe.dataset_name == 'LUNA16':
-                            nodule_prio = clusters_json[idx]['nodule_priority']
                         nodule_score = all_candidates_scores[idx]
                         clusters_json[idx]['nodule_score'] = str(nodule_score)
                         out_clusters_json.append(clusters_json[idx])
-                    else:
-                        if pipe.dataset_name == 'LUNA16':
-                            nodule_prio = 0
-                        nodule_score = 0
-                    if pipe.dataset_name == 'LUNA16':
-                        out_lst.write('{}\t{}\t{}\t{}\n'.format(patient + '_' + str(idx_cnt), nodule_prio, path, str(nodule_score)))
-                    else:
-                        out_lst.write('{}\t{}\t{}\t{}\n'.format(patient + '_' + str(idx_cnt), patient_json['label'], path, str(nodule_score)))
         pipe.save_json('out.json', out_json)
 
 class score_nodules():

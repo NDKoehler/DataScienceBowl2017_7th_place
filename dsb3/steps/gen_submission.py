@@ -41,9 +41,10 @@ def run(splitting,
         pipe.log.info('use default patients_lst_path {}'.format(patients_lst_path))
     # get patiens data from within pipe/ called folder /arrays.*.npy
     if patients_lst_path == 'filter_candidates' or \
-         patients_lst_path == 'interpolate_candidates':
-                va_lst_path = pipe.get_step_dir('interpolate_candidates') + 'va_correct_split.lst' ################### va_p
-                data_from_wihtin_pipe = 'fc' if patients_lst_path=='filter_candidates' else 'ic'
+        patients_lst_path == 'interpolate_candidates':
+        #broken
+        va_lst_path = pipe.get_step_dir(patients_lst_path) + 'va_patients.lst' if splitting=='validation' else 'ho_patients.lst'
+        data_from_wihtin_pipe = 'fc' if patients_lst_path=='filter_candidates' else 'ic'
     else:
         # if not path column in called list is used
         data_from_wihtin_pipe = False

@@ -42,7 +42,7 @@ def run(splitting,
     # get patiens data from within pipe/ called folder /arrays.*.npy
     if patients_lst_path == 'filter_candidates' or \
          patients_lst_path == 'interpolate_candidates':
-                va_lst_path = pipe.get_step_dir('interpolate_candidates') + 'tr_patients.lst' ################### va_p
+                va_lst_path = pipe.get_step_dir('interpolate_candidates') + 'va_correct_split.lst' ################### va_p
                 data_from_wihtin_pipe = 'fc' if patients_lst_path=='filter_candidates' else 'ic'
     else:
         # if not path column in called list is used
@@ -54,7 +54,7 @@ def run(splitting,
         sample_submission = pd.read_csv(sample_submission_lst_path) # header: id, cancer
         patients_2_process = sample_submission['id'].values.tolist()
     elif splitting == 'validation':
-        validation_DF = pd.read_csv(va_lst_path, header=None, sep='\t')
+        validation_DF = pd.read_csv(patients_lst_path, header=None, sep='\t')
         validation_DF = validation_DF.rename(columns={0:'id',1:'cancer_label',2:'path'})
         patients_2_process = validation_DF['id'].values.tolist()
     patients_2_process = list(set(patients_2_process))
@@ -124,7 +124,7 @@ def run(splitting,
     # mean over all predictions and save submission csv
     for pa_cnt, patient in tqdm(enumerate(patients_2_process)):
         if splitting == 'submission':
-                sample_submission[sample_submission['id'] == patient]['cancer'] = np.mean(patients_predictions[pa_cnt])
+                sample_submission['cancer'][sample_submission['id'] == patient] = np.mean(patients_predictions[pa_cnt])
     # save submission to submission dir
     if splitting == 'submission':
         submission_path = pipe.get_step_dir() + 'submission.csv'
@@ -249,4 +249,4 @@ class cancer_score():
             l = logloss(predictions, 1 if lab>0 else 0)
             return self.all_predictions, l
         else:
-            return self.all_prediction
+            return self.all_predictions

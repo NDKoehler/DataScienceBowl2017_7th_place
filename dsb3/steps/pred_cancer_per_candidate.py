@@ -15,7 +15,8 @@ from .. import tf_tools
 def run(num_augs_per_img,
         checkpoint_dir,
         n_candidates,
-        all_patients):
+        all_patients,
+        list_to_predict):
     # load some information json
     gen_candidates_json = pipe.load_json('out.json', 'gen_candidates')
     out_json = OrderedDict()
@@ -32,24 +33,23 @@ def run(num_augs_per_img,
     # generate nodule_score_session
     gen_nodule_score = score_nodules(num_augs_per_img, net_config, pipe.dataset_name)
     # loop over lsts
-    if all_patients:
-        splits = ['tr', 'va', 'ho']
-    else:
-        splits = ['va']
+    name = list_to_predict.split('/')[-1].split('.')[0]
+    splits = [name]
     for lst_type in splits:
         #patients_DF_path = pipe.get_step_dir('interpolate_candidates') + lst_type + '_patients.lst'
-        patients_DF_path = '/media/juler/Data_0/dsb3/datapipelines/dsb3_0/dsb3_0/interpolate_candidates_gold/va_correct_split.lst'
+        patients_DF_path = list_to_predict#'/media/juler/Data_0/dsb3/datapipelines/dsb3_0/dsb3_0/interpolate_candidates_gold/va_correct_split.lst'
         if os.path.exists(patients_DF_path):
             try:
                 patients_DF = pd.read_csv(patients_DF_path, sep = '\t', header=None)
             except:
                 pipe.log.error(' some error occured reading patients list {}. continue with next list.'.format(lst_type))
-                continue
+                sys.exit()
         else:
             pipe.log.error('patients list {} does not exist. continue with next list.'.format(lst_type))
-            continue
+            sys.exit()
         if len(patients_DF) == 0:
             pipe.log.error('empty patient list {}'.format(lst_type))
+            sys.exit()
             continue
         # initialize out_list
         open(pipe.get_step_dir() + lst_type + '_candidates.lst', 'w').close()
@@ -65,7 +65,7 @@ def run(num_augs_per_img,
             out_clusters_json = out_patient_json['clusters']
             num_real_candidates = len(clusters_json)
             # get patients interpolated candidates
-            all_candidates = pipe.load_array(patient+'.npy', 'interpolate_candidates_gold')[:num_real_candidates]
+            all_candidates = pipe.load_array(patient+'.npy', 'interpolate_candidates')[:num_real_candidates]
             # get candidates labels
             # get all candidates scores
             all_candidates_scores = []

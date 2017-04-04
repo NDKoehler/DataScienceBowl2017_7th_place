@@ -30,7 +30,7 @@ pipe = OrderedDict([
 # ------------------------------------------------------------------------------
 # step parameters
 # ------------------------------------------------------------------------------
-all_patients = False
+all_patients = True
 assets_path = '../dsb3a_assets/'
 
 resample_lungs = OrderedDict([
@@ -82,10 +82,12 @@ filter_candidates = OrderedDict([
 
 pred_cancer_per_candidate = OrderedDict([
     ('n_candidates', 20),
-#    ('checkpoint_dir', assets_dir + 'checkpoints/pred_cancer_per_candidate/cross_3cands_720epochs/'),
     ('checkpoint_dir', assets_path + 'checkpoints/pred_cancer_per_candidate/gold_cross_1randCand_410epochs/'),
-    ('num_augs_per_img', 1), # 1 means NO augmentation	
-    ('all_patients', all_patients),
+    ('num_augs_per_img', 1), # 1 means NO augmentation    
+    ('all_patients', True),
+    ('lists_to_predict', ['/media/juler/Data_0/dsb3/datapipelines/dsb3_0/dsb3_0/interpolate_candidates/tr_correct_split.lst',
+                         '/media/juler/Data_0/dsb3/datapipelines/dsb3_0/dsb3_0/interpolate_candidates/va_correct_split.lst',
+                         '/media/juler/Data_0/dsb3/datapipelines/dsb3_0/dsb3_0/interpolate_candidates/ho_correct_split.lst'])
 ])
 
 gen_submission = OrderedDict([
@@ -97,12 +99,16 @@ gen_submission = OrderedDict([
 ])
 
 include_nodule_distr = OrderedDict([
-    ('n_candidates', 5),
+    ('lists_to_predict',  ['/media/juler/Data_0/dsb3/datapipelines/dsb3_0/dsb3_0/pred_cancer_per_candidate/tr_candidates.lst',
+                         '/media/juler/Data_0/dsb3/datapipelines/dsb3_0/dsb3_0/pred_cancer_per_candidate/va_candidates.lst',
+                         '/media/juler/Data_0/dsb3/datapipelines/dsb3_0/dsb3_0/pred_cancer_per_candidate/ho_candidates.lst']),
+    ('n_candidates', 20),
     ('bin_size', 0.05),
     ('kernel_width', 0.2),
     ('xg_max_depth', 2),
-    ('xg_eta', 1),
-    ('xg_num_round', 2)
+    ('xg_eta', 0.01),
+    ('xg_num_round', 10000),
+    ('sample_submission_lst_path', '../raw_data/dsb3/stage1_sample_submission.csv'),
 ])
 
 # ------------------------------------------------------------------------------

@@ -122,7 +122,11 @@ def main():
             with open(pipe.get_step_dir() + '/log.txt', 'a') as f:
                 f.write(log_save)
             sys.exit(0)
-        pipe._run_step(step_name, getattr(params, step_name), args.step_dir_suffix)
+        try:
+            params_dict = getattr(params, step_name+args.step_dir_suffix)
+        except AttributeError:
+            raise AttributeError('Your params file needs to contain a dictionary "' + step_name + args.step_dir_suffix + '".')
+        pipe._run_step(step_name, params_dict, args.step_dir_suffix)
         #pipe._visualize_step(step_name)
 
 def steps_descr():

@@ -10,9 +10,10 @@ from .. import pipeline as pipe
 from .. import utils
 
 # rank the candidatess / clusters according to the following score
-sort_clusters_by = 'prob_sum_min_nodule_size' #prob_sum_min_nodule_size # prob_sum_cluster
+
 
 def run(n_candidates,
+        sort_clusters_by,
         ensemble_foldername_of_prob_maps,
         threshold_prob_map,
         cube_shape,
@@ -28,6 +29,7 @@ def run(n_candidates,
     patients_candidates_json = OrderedDict(Parallel(n_jobs=min(pipe.n_CPUs, len(considered_patients)), verbose=100)(
                                            delayed(process_patient)(patient,
                                                                     n_candidates,
+                                                                    sort_clusters_by,
                                                                     threshold_prob_map,
                                                                     cube_shape,
                                                                     resample_lungs_json,
@@ -60,6 +62,7 @@ def run(n_candidates,
 
 def process_patient(patient,
                     n_candidates,
+                    sort_clusters_by,
                     threshold_prob_map,
                     cube_shape,
                     resample_lungs_json,

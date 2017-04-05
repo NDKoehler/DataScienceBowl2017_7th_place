@@ -195,10 +195,11 @@ def _init_run(run=-1, run_descr='', init_run=-1):
     # create directory if it's not there already
     utils.ensure_dir(get_write_dir())
 
-def _init_step(step_name, mode='w'):
-    global __step, __step_name
+def _init_step(step_name, mode='w', suffix=''):
+    global __step, __step_name, __step_dir_suffix
     __step = [k for k, v in avail_steps.items() if v == step_name][0] 
     __step_name = step_name
+    __step_dir_suffix = suffix + __step_dir_suffix
     # create step directories, log files etc.
     step_dir = get_step_dir()
     # data directory of step
@@ -207,13 +208,13 @@ def _init_step(step_name, mode='w'):
     # init step logger
     _init_log_step(step_name, mode=mode)
 
-def _run_step(step_name, params):
-    _init_step(step_name)
+def _run_step(step_name, params, suffix=''):
+    _init_step(step_name, suffix=suffix)
     info = 'run ' + str(__run) + ' (' + avail_runs[str(__run)][1] + ')' \
            + ' / step ' + str(__step) + ' (' + __step_name + ')' \
            + (' with init ' + str(__init_run) if __init_run > -1 else '')
     if __step_dir_suffix != '':
-        info += ' / patients ' + __step_dir_suffix.lstrip('_')
+        info += ' / writing to ' + get_step_dir()
     log_pipe.info(info)
     # output params dict for visual check
     params_info = info

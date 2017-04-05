@@ -41,6 +41,8 @@ def main():
     aa = parser.add_argument_group('Other').add_argument
     aa('-h', '--help', action='help',
        help='Show this help message and exit.')
+    aa('-s', '--step_dir_suffix', type=str, default=None, metavar='s',
+       help='Provide suffix for step output directory name.')
     aa('-n', '--n_patients', type=int, default=None, metavar='n',
        help='Choose the number of patients to process to test the pipeline (default: read from params file).')
     aa('--patient', type=str, default=None,
@@ -120,7 +122,7 @@ def main():
             with open(pipe.get_step_dir() + '/log.txt', 'a') as f:
                 f.write(log_save)
             sys.exit(0)
-        pipe._run_step(step_name, getattr(params, step_name))
+        pipe._run_step(step_name, getattr(params, step_name), args.step_dir_suffix)
         #pipe._visualize_step(step_name)
 
 def steps_descr():

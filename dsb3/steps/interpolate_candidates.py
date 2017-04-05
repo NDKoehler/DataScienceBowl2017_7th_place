@@ -185,9 +185,16 @@ def gen_patients_candidates(line_num,
         prob_map = pipe.load_array(clu['prob_map_basename'], 'gen_candidates').astype('int16') # z, y, x
         prob_map = resample_lungs.resize_and_interpolate_array(prob_map, resampled_scan_spacing_zyx_mm_px, new_spacing_zyx)
         prob_map = np.clip(prob_map, 0, 255).astype('uint8') # back to uint8
-        prob_map = prob_map[:new_candidates_shape_zyx[0],
-                            :new_candidates_shape_zyx[1],
-                            :new_candidates_shape_zyx[2]]
+        prob_map_embed = np.zeros(new_candidates_shape_zyx, dtype=np.uint8)
+        idx0 = max((new_candidates_shape_zyx[0]-prob_map.shape[0])//2,0)
+        idx1 = idx0+min(new_candidates_shape_zyx[0], prob_map.shape[0])
+        idx2 = max((new_candidates_shape_zyx[1]-prob_map.shape[1])//2,0)
+        idx3 = idx2+min(new_candidates_shape_zyx[1], prob_map.shape[1])
+        idx4 = max((new_candidates_shape_zyx[2]-prob_map.shape[2])//2,0)
+        idx5 = idx4+min(new_candidates_shape_zyx[2], prob_map.shape[2])
+        prob_map_embed[idx0:idx1, idx2:idx3, idx4:idx5] = prob_map[:new_candidates_shape_zyx[0],
+                                                       :new_candidates_shape_zyx[1],
+                                                       :new_candidates_shape_zyx[2]]
         # visualize
         if np.random.randint(0, 100) == 0:
             old_image = pipe.load_array(clu['img_basename'], 'gen_candidates')
@@ -210,6 +217,6 @@ def gen_patients_candidates(line_num,
         # expand dimensions
         image = np.expand_dims(image, 3)
         images.append(image)
-        prob_map = np.expand_dims(prob_map, 3)
-        prob_maps.append(prob_map)
+        prob_map_embed = np.expand_dims(prob_map_embed, 3)
+        prob_maps.append(prob_map_embed)
     return [patient, patient_label, images, prob_maps]

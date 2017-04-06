@@ -170,9 +170,9 @@ def gen_patients_candidates(line_num,
     for clu_num, clu in enumerate(clusters[:min(len(clusters), n_candidates)]):
         candidate_box_coords_zyx_px = list(np.array(clu['box_coords_px']) + np.array(lung_box_offset_zzyyxx_px))
         crop_raw = [int(np.round(candidate_box_coords_zyx_px[dim] * convert2raw_scan_spacing_factor[dim])) for dim in range(6)]
-        crop_raw = [int(max(0, crop_raw[i] - 1)) # tiny buffer here
+        crop_raw = [int(max(0, crop_raw[i] - 32)) # tiny buffer here
                     if i % 2 == 0 else 
-                    int(min(crop_raw[i] + 1, raw_lung_array.shape[i // 2])) for i in range(6)]
+                    int(min(crop_raw[i] + 32, raw_lung_array.shape[i // 2])) for i in range(6)]
         image_raw = raw_lung_array[crop_raw[0]:crop_raw[1], crop_raw[2]:crop_raw[3], crop_raw[4]:crop_raw[5]].copy()
         image = resample_lungs.resize_and_interpolate_array(image_raw, old_spacing_zyx, new_spacing_zyx)
         image = resample_lungs.clip_HU_range(image, HU_tissue_range)

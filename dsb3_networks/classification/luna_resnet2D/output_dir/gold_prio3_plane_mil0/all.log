@@ -1,0 +1,71 @@
+2017-04-03 13:27:00 | line:03 - INFO | Saving evaluation results to: output_dir/gold_prio3_plane_mil0
+2017-04-03 13:27:37 | line:03 - INFO | Summary name Test examples is illegal; using Test_examples instead.
+2017-04-03 13:27:37 | line:03 - INFO | Summary name Train examples is illegal; using Train_examples instead.
+2017-04-03 13:27:37 | line:03 - INFO | Selected Optimizer: MomentumOptimizer
+2017-04-03 13:27:37 | line:03 - INFO | Training on gpu:1
+2017-04-03 13:27:39 | line:03 - INFO | Summary name train/logloss(raw) is illegal; using train/logloss_raw_ instead.
+2017-04-03 13:27:39 | line:03 - INFO | Adding all parameters to training endpoints
+2017-04-03 13:27:45 | line:03 - DEBUG | add batchnorm updates
+2017-04-03 13:27:46 | line:03 - DEBUG | batchnorm updates in train_op
+2017-04-03 13:27:47 | line:03 - INFO | Summary name validation/logloss(raw) is illegal; using validation/logloss_raw_ instead.
+2017-04-03 13:27:47 | line:03 - WARNING | From ../tf_scripts/modules/train_singlegpu.py:278: initialize_all_variables (from tensorflow.python.ops.variables) is deprecated and will be removed after 2017-03-02.
+Instructions for updating:
+Use `tf.global_variables_initializer` instead.
+2017-04-03 13:30:39 | line:03 - INFO | Epoch 0, tr_loss = 0.28888 (0.2 examples/sec; 156.093 sec/epoch)
+2017-04-03 13:30:40 | line:03 - INFO | Epoch 0, va_loss = 0.30861 (40.6 examples/sec, 0.788 sec/epoch)
+2017-04-03 13:30:40 | line:03 - DEBUG | Add summary string...
+2017-04-03 13:30:40 | line:03 - INFO | Time per Epoch: 157.81304454803467
+2017-04-03 13:33:14 | line:03 - INFO | Epoch 1, tr_loss = 0.22224 (0.2 examples/sec; 153.166 sec/epoch)
+2017-04-03 13:33:14 | line:03 - INFO | Epoch 1, va_loss = 0.20453 (45.8 examples/sec, 0.699 sec/epoch)
+2017-04-03 13:33:14 | line:03 - INFO | Time per Epoch: 153.86605858802795
+2017-04-03 13:35:48 | line:03 - INFO | Epoch 2, tr_loss = 0.21094 (0.2 examples/sec; 154.134 sec/epoch)
+2017-04-03 13:35:49 | line:03 - INFO | Epoch 2, va_loss = 0.17103 (45.6 examples/sec, 0.702 sec/epoch)
+2017-04-03 13:35:49 | line:03 - INFO | Time per Epoch: 154.83727526664734
+2017-04-03 13:38:23 | line:03 - INFO | Epoch 3, tr_loss = 0.19750 (0.2 examples/sec; 153.851 sec/epoch)
+2017-04-03 13:38:24 | line:03 - INFO | Epoch 3, va_loss = 0.15312 (45.5 examples/sec, 0.704 sec/epoch)
+2017-04-03 13:38:24 | line:03 - INFO | Saving checkpoint to: output_dir/gold_prio3_plane_mil0, step: 3
+2017-04-03 13:38:30 | line:03 - INFO | Time per Epoch: 160.87456035614014
+2017-04-03 13:41:04 | line:03 - INFO | Epoch 4, tr_loss = 0.19367 (0.2 examples/sec; 154.241 sec/epoch)
+2017-04-03 13:41:05 | line:03 - INFO | Epoch 4, va_loss = 0.11860 (45.6 examples/sec, 0.702 sec/epoch)
+2017-04-03 13:41:05 | line:03 - INFO | Time per Epoch: 154.94431495666504
+2017-04-03 13:43:40 | line:03 - INFO | Epoch 5, tr_loss = 0.19312 (0.2 examples/sec; 155.365 sec/epoch)
+2017-04-03 13:43:41 | line:03 - INFO | Epoch 5, va_loss = 0.11964 (45.9 examples/sec, 0.698 sec/epoch)
+2017-04-03 13:43:41 | line:03 - INFO | Time per Epoch: 156.06337809562683
+2017-04-03 13:46:15 | line:03 - INFO | Epoch 6, tr_loss = 0.19103 (0.2 examples/sec; 153.819 sec/epoch)
+2017-04-03 13:46:16 | line:03 - INFO | Epoch 6, va_loss = 0.10192 (44.9 examples/sec, 0.713 sec/epoch)
+2017-04-03 13:46:16 | line:03 - INFO | Saving checkpoint to: output_dir/gold_prio3_plane_mil0, step: 6
+2017-04-03 13:46:22 | line:03 - INFO | Time per Epoch: 160.8817720413208
+2017-04-03 13:48:55 | line:03 - INFO | Epoch 7, tr_loss = 0.19706 (0.2 examples/sec; 152.710 sec/epoch)
+2017-04-03 13:48:55 | line:03 - INFO | Epoch 7, va_loss = 0.09246 (45.6 examples/sec, 0.701 sec/epoch)
+2017-04-03 13:48:55 | line:03 - INFO | Time per Epoch: 153.41242384910583
+2017-04-03 13:51:31 | line:03 - INFO | Epoch 8, tr_loss = 0.19210 (0.2 examples/sec; 156.020 sec/epoch)
+2017-04-03 13:51:32 | line:03 - INFO | Epoch 8, va_loss = 0.09516 (43.5 examples/sec, 0.735 sec/epoch)
+2017-04-03 13:51:32 | line:03 - INFO | Time per Epoch: 156.75594997406006
+2017-04-03 13:54:10 | line:03 - INFO | Epoch 9, tr_loss = 0.18358 (0.2 examples/sec; 157.510 sec/epoch)
+2017-04-03 13:54:10 | line:03 - INFO | Epoch 9, va_loss = 0.10799 (45.8 examples/sec, 0.698 sec/epoch)
+2017-04-03 13:54:10 | line:03 - INFO | Saving checkpoint to: output_dir/gold_prio3_plane_mil0, step: 9
+2017-04-03 13:54:17 | line:03 - INFO | Time per Epoch: 164.40684247016907
+2017-04-03 13:56:50 | line:03 - INFO | Epoch 10, tr_loss = 0.18188 (0.2 examples/sec; 153.420 sec/epoch)
+2017-04-03 13:56:51 | line:03 - INFO | Epoch 10, va_loss = 0.12326 (45.9 examples/sec, 0.698 sec/epoch)
+2017-04-03 13:56:51 | line:03 - DEBUG | Add summary string...
+2017-04-03 13:56:51 | line:03 - INFO | Time per Epoch: 154.85373759269714
+2017-04-03 13:59:25 | line:03 - INFO | Epoch 11, tr_loss = 0.17569 (0.2 examples/sec; 153.699 sec/epoch)
+2017-04-03 13:59:26 | line:03 - INFO | Epoch 11, va_loss = 0.14046 (45.6 examples/sec, 0.702 sec/epoch)
+2017-04-03 13:59:26 | line:03 - INFO | Time per Epoch: 154.40107989311218
+2017-04-03 14:02:01 | line:03 - INFO | Epoch 12, tr_loss = 0.17673 (0.2 examples/sec; 155.430 sec/epoch)
+2017-04-03 14:02:02 | line:03 - INFO | Epoch 12, va_loss = 0.12500 (45.6 examples/sec, 0.701 sec/epoch)
+2017-04-03 14:02:02 | line:03 - INFO | Saving checkpoint to: output_dir/gold_prio3_plane_mil0, step: 12
+2017-04-03 14:02:09 | line:03 - INFO | Time per Epoch: 162.74350666999817
+2017-04-03 14:04:47 | line:03 - INFO | Epoch 13, tr_loss = 0.17341 (0.2 examples/sec; 158.019 sec/epoch)
+2017-04-03 14:04:47 | line:03 - INFO | Epoch 13, va_loss = 0.16272 (45.6 examples/sec, 0.702 sec/epoch)
+2017-04-03 14:04:47 | line:03 - INFO | Time per Epoch: 158.72141242027283
+2017-04-03 14:07:24 | line:03 - INFO | Epoch 14, tr_loss = 0.17648 (0.2 examples/sec; 156.985 sec/epoch)
+2017-04-03 14:07:25 | line:03 - INFO | Epoch 14, va_loss = 0.12176 (45.9 examples/sec, 0.697 sec/epoch)
+2017-04-03 14:07:25 | line:03 - INFO | Time per Epoch: 157.68342089653015
+2017-04-03 14:09:58 | line:03 - INFO | Epoch 15, tr_loss = 0.17758 (0.2 examples/sec; 152.968 sec/epoch)
+2017-04-03 14:09:59 | line:03 - INFO | Epoch 15, va_loss = 0.12269 (45.5 examples/sec, 0.703 sec/epoch)
+2017-04-03 14:09:59 | line:03 - INFO | Saving checkpoint to: output_dir/gold_prio3_plane_mil0, step: 15
+2017-04-03 14:10:05 | line:03 - INFO | Time per Epoch: 159.89024257659912
+2017-04-03 14:12:39 | line:03 - INFO | Epoch 16, tr_loss = 0.16814 (0.2 examples/sec; 153.834 sec/epoch)
+2017-04-03 14:12:39 | line:03 - INFO | Epoch 16, va_loss = 0.10544 (44.9 examples/sec, 0.713 sec/epoch)
+2017-04-03 14:12:39 | line:03 - INFO | Time per Epoch: 154.5484573841095

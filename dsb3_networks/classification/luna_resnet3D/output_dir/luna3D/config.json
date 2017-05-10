@@ -1,0 +1,80 @@
+{
+    "dropout_keep_prob": 1.0,
+    "optimizer": "MomentumOptimizer",
+    "output_dir": "output_dir/luna3D",
+    "MOVING_AVERAGE_DECAY": 0.9,
+    "rand_cropping_ZminZmaxYminYmaxXminXmax": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+    ],
+    "candidate_mode": true,
+    "in_image_shape": [
+        1,
+        64,
+        64,
+        64,
+        2
+    ],
+    "importance_dict": {
+        "0": 0.2,
+        "1": 1.0
+    },
+    "rand_drop_planes": 0,
+    "kernel_num": 16,
+    "importance_sampling": true,
+    "max_rot_angle": 45,
+    "crossed_axes": false,
+    "va_num_examples": 865,
+    "log_device_placement": false,
+    "rand_rot": true,
+    "degree_90_rot": true,
+    "gpu_fraction": 0.9,
+    "num_crossed_layers": 1,
+    "rand_rot_axes": [
+        0,
+        1,
+        2
+    ],
+    "max_steps": 650,
+    "load_in_ram": true,
+    "label_shape": [
+        1
+    ],
+    "gpus": [
+        1
+    ],
+    "num_classes": 2,
+    "plane_mil": false,
+    "BATCH_NORM_SCALE": true,
+    "save_step": 5,
+    "batch_size": 16,
+    "pretrained_checkpoint_dir": "",
+    "allow_soft_placement": true,
+    "val_lst": "/media/niklas/Data_3/dsb3/datapipeline_gen9/LUNA16_0/interpolate_candidates/va_candidates_binary.lst",
+    "weights_initializer": "xavier_initializer",
+    "rand_mirror_axes": [
+        0,
+        1,
+        2
+    ],
+    "BATCH_NORM_CENTER": true,
+    "momentum": 0.9,
+    "summary_step": 10,
+    "predictions_dir": "",
+    "image_shape": [
+        1,
+        64,
+        64,
+        64,
+        2
+    ],
+    "tr_num_examples": 16736,
+    "model_name": "resnet3D",
+    "min_rot_angle": -45,
+    "train_lst": "/media/niklas/Data_3/dsb3/datapipeline_gen9/LUNA16_0/interpolate_candidates/tr_candidates_binary.lst",
+    "learning_rate": 0.001
+}

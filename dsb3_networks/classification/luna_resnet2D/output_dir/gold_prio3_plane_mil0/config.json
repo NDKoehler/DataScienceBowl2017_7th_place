@@ -1,0 +1,82 @@
+{
+    "rand_rot_axes": [
+        0
+    ],
+    "importance_dict": {
+        "0": 0.2,
+        "1": 1.0
+    },
+    "BATCH_NORM_CENTER": true,
+    "output_dir": "output_dir/gold_prio3_plane_mil0",
+    "momentum": 0.9,
+    "importance_sampling": true,
+    "rand_rot": true,
+    "summary_step": 10,
+    "min_rot_angle": -45,
+    "learning_rate": 0.001,
+    "crossed_axes": [
+        0,
+        1,
+        2
+    ],
+    "weights_initializer": "xavier_initializer",
+    "max_steps": 100,
+    "val_lst": "/media/niklas/Data_3/dsb3/datapipeline_gen9/LUNA16_0/interpolate_candidates/va_candidates_binary.lst",
+    "MOVING_AVERAGE_DECAY": 0.9,
+    "gpus": [
+        1
+    ],
+    "rand_cropping_ZminZmaxYminYmaxXminXmax": [
+        31,
+        32,
+        false,
+        false,
+        false,
+        false
+    ],
+    "rand_mirror_axes": [
+        0,
+        1,
+        2
+    ],
+    "train_lst": "/media/niklas/Data_3/dsb3/datapipeline_gen9/LUNA16_0/interpolate_candidates/tr_candidates_binary.lst",
+    "degree_90_rot": true,
+    "BATCH_NORM_SCALE": true,
+    "optimizer": "MomentumOptimizer",
+    "num_classes": 2,
+    "pretrained_checkpoint_dir": "",
+    "batch_size": 32,
+    "kernel_num": 16,
+    "log_device_placement": false,
+    "tr_num_examples": 16736,
+    "allow_soft_placement": true,
+    "predictions_dir": "",
+    "max_rot_angle": 45,
+    "image_shape": [
+        1,
+        3,
+        64,
+        64,
+        2
+    ],
+    "in_image_shape": [
+        1,
+        64,
+        64,
+        64,
+        2
+    ],
+    "model_name": "resnet2D",
+    "load_in_ram": true,
+    "candidate_mode": true,
+    "num_crossed_layers": 1,
+    "save_step": 3,
+    "rand_drop_planes": 0,
+    "gpu_fraction": 0.9,
+    "plane_mil": false,
+    "label_shape": [
+        1
+    ],
+    "dropout_keep_prob": 1.0,
+    "va_num_examples": 865
+}

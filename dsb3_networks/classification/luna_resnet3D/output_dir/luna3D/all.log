@@ -1,0 +1,56 @@
+2017-04-04 19:56:04 | line:04 - INFO | Saving evaluation results to: output_dir/luna3D
+2017-04-04 19:56:48 | line:04 - INFO | Summary name Test examples is illegal; using Test_examples instead.
+2017-04-04 19:56:48 | line:04 - INFO | Summary name Train examples is illegal; using Train_examples instead.
+2017-04-04 19:56:48 | line:04 - INFO | Selected Optimizer: MomentumOptimizer
+2017-04-04 19:56:48 | line:04 - INFO | Training on gpu:1
+2017-04-04 19:56:50 | line:04 - INFO | Summary name train/logloss(raw) is illegal; using train/logloss_raw_ instead.
+2017-04-04 19:56:50 | line:04 - INFO | Adding all parameters to training endpoints
+2017-04-04 19:56:55 | line:04 - DEBUG | add batchnorm updates
+2017-04-04 19:56:56 | line:04 - DEBUG | batchnorm updates in train_op
+2017-04-04 19:56:56 | line:04 - INFO | Summary name validation/logloss(raw) is illegal; using validation/logloss_raw_ instead.
+2017-04-04 19:56:56 | line:04 - WARNING | From ../tf_scripts/modules/train_singlegpu.py:278: initialize_all_variables (from tensorflow.python.ops.variables) is deprecated and will be removed after 2017-03-02.
+Instructions for updating:
+Use `tf.global_variables_initializer` instead.
+2017-04-04 20:09:08 | line:04 - INFO | Epoch 0, tr_loss = 0.27556 (0.0 examples/sec; 717.950 sec/epoch)
+2017-04-04 20:09:22 | line:04 - INFO | Epoch 0, va_loss = 0.17122 (1.1 examples/sec, 14.100 sec/epoch)
+2017-04-04 20:09:22 | line:04 - DEBUG | Add summary string...
+2017-04-04 20:09:23 | line:04 - INFO | Time per Epoch: 732.9009094238281
+2017-04-04 20:21:41 | line:04 - INFO | Epoch 1, tr_loss = 0.19754 (0.0 examples/sec; 738.423 sec/epoch)
+2017-04-04 20:21:56 | line:04 - INFO | Epoch 1, va_loss = 0.14572 (1.1 examples/sec, 14.960 sec/epoch)
+2017-04-04 20:21:56 | line:04 - INFO | Time per Epoch: 753.3839282989502
+2017-04-04 20:34:08 | line:04 - INFO | Epoch 2, tr_loss = 0.19966 (0.0 examples/sec; 732.193 sec/epoch)
+2017-04-04 20:34:23 | line:04 - INFO | Epoch 2, va_loss = 0.08651 (1.1 examples/sec, 14.993 sec/epoch)
+2017-04-04 20:34:23 | line:04 - INFO | Time per Epoch: 747.1872363090515
+2017-04-04 20:46:47 | line:04 - INFO | Epoch 3, tr_loss = 0.18480 (0.0 examples/sec; 743.963 sec/epoch)
+2017-04-04 20:47:02 | line:04 - INFO | Epoch 3, va_loss = 0.08817 (1.1 examples/sec, 14.246 sec/epoch)
+2017-04-04 20:47:02 | line:04 - INFO | Time per Epoch: 758.2095346450806
+2017-04-04 20:59:31 | line:04 - INFO | Epoch 4, tr_loss = 0.18071 (0.0 examples/sec; 749.709 sec/epoch)
+2017-04-04 20:59:48 | line:04 - INFO | Epoch 4, va_loss = 0.09615 (1.0 examples/sec, 16.637 sec/epoch)
+2017-04-04 20:59:48 | line:04 - INFO | Time per Epoch: 766.3475568294525
+2017-04-04 21:12:16 | line:04 - INFO | Epoch 5, tr_loss = 0.17843 (0.0 examples/sec; 747.860 sec/epoch)
+2017-04-04 21:12:32 | line:04 - INFO | Epoch 5, va_loss = 0.12123 (1.0 examples/sec, 16.120 sec/epoch)
+2017-04-04 21:12:32 | line:04 - INFO | Saving checkpoint to: output_dir/luna3D, step: 5
+2017-04-04 21:12:38 | line:04 - INFO | Time per Epoch: 769.4507071971893
+2017-04-04 21:24:47 | line:04 - INFO | Epoch 6, tr_loss = 0.16762 (0.0 examples/sec; 729.389 sec/epoch)
+2017-04-04 21:25:02 | line:04 - INFO | Epoch 6, va_loss = 0.13003 (1.0 examples/sec, 15.326 sec/epoch)
+2017-04-04 21:25:02 | line:04 - INFO | Time per Epoch: 744.7155225276947
+2017-04-04 21:37:15 | line:04 - INFO | Epoch 7, tr_loss = 0.16895 (0.0 examples/sec; 732.981 sec/epoch)
+2017-04-04 21:37:31 | line:04 - INFO | Epoch 7, va_loss = 0.08984 (1.0 examples/sec, 16.204 sec/epoch)
+2017-04-04 21:37:31 | line:04 - INFO | Time per Epoch: 749.1861712932587
+2017-04-04 21:49:34 | line:04 - INFO | Epoch 8, tr_loss = 0.16230 (0.0 examples/sec; 722.902 sec/epoch)
+2017-04-04 21:49:50 | line:04 - INFO | Epoch 8, va_loss = 0.12232 (1.1 examples/sec, 15.234 sec/epoch)
+2017-04-04 21:49:50 | line:04 - INFO | Time per Epoch: 738.136773109436
+2017-04-04 22:01:57 | line:04 - INFO | Epoch 9, tr_loss = 0.16019 (0.0 examples/sec; 727.528 sec/epoch)
+2017-04-04 22:02:12 | line:04 - INFO | Epoch 9, va_loss = 0.11145 (1.1 examples/sec, 15.092 sec/epoch)
+2017-04-04 22:02:12 | line:04 - INFO | Time per Epoch: 742.6205787658691
+2017-04-04 22:14:19 | line:04 - INFO | Epoch 10, tr_loss = 0.16157 (0.0 examples/sec; 727.051 sec/epoch)
+2017-04-04 22:14:34 | line:04 - INFO | Epoch 10, va_loss = 0.12112 (1.1 examples/sec, 14.620 sec/epoch)
+2017-04-04 22:14:34 | line:04 - DEBUG | Add summary string...
+2017-04-04 22:14:34 | line:04 - INFO | Saving checkpoint to: output_dir/luna3D, step: 10
+2017-04-04 22:14:40 | line:04 - INFO | Time per Epoch: 747.9589493274689
+2017-04-04 22:26:32 | line:04 - INFO | Epoch 11, tr_loss = 0.16315 (0.0 examples/sec; 711.562 sec/epoch)
+2017-04-04 22:26:46 | line:04 - INFO | Epoch 11, va_loss = 0.10923 (1.1 examples/sec, 14.344 sec/epoch)
+2017-04-04 22:26:46 | line:04 - INFO | Time per Epoch: 725.9066042900085
+2017-04-04 22:38:41 | line:04 - INFO | Epoch 12, tr_loss = 0.15555 (0.0 examples/sec; 714.656 sec/epoch)
+2017-04-04 22:38:56 | line:04 - INFO | Epoch 12, va_loss = 0.08656 (1.0 examples/sec, 15.326 sec/epoch)
+2017-04-04 22:38:56 | line:04 - INFO | Time per Epoch: 729.9827799797058

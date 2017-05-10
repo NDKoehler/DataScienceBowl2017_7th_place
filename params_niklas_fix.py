@@ -15,7 +15,7 @@ pipe = OrderedDict([
         'LUNA16': raw_LUNA_absolute_path,
         'dsb3': raw_data_absolute_path + 'stage?/',
     }),
-    ('write_basedir', '../datapipeline_final/'),
+    ('write_basedir', './datapipeline_final/'),
 # data splits
     ('random_seed', 17),
     ('tr_va_ho_split', [0.8, 0.2, 0]), # something like 0.15, 0.7, 0.15
@@ -95,28 +95,28 @@ interpolate_candidates_res07 = OrderedDict([
 gen_submission_2D_05res_80 = OrderedDict([
     ('splitting', 'submission'), # 'validation' or 'submission' or 'holdout'<-not implemented yet
     ('checkpoint_dir', './dsb3_networks/classification/resnet2D_0.5res_80/output_dir/old_but_gold_plane_mil0_b4_init_luna'),
-    ('patients_lst_path', '../datapipeline_final/dsb3_0/interpolate_candidates_res05/ho_patients.lst'), # if False->filter_candidates; if 'interpolate_candidates'->lst and arrays from current dataset is used
+    ('patients_lst_path', './datapipeline_final/dsb3_0/interpolate_candidates_res05/ho_patients.lst'), # if False->filter_candidates; if 'interpolate_candidates'->lst and arrays from current dataset is used
     ('num_augs_per_img', 0),
     ('sample_submission_lst_path', '/'.join(pipe['raw_data_dirs']['dsb3'].split('/')[:-2])  + '/stage2_sample_submission.csv'),
 ])
 gen_submission_2D_07res_80 = OrderedDict([
     ('splitting', 'submission'), # 'validation' or 'submission' or 'holdout'<-not implemented yet
     ('checkpoint_dir', './dsb3_networks/classification/resnet2D_0.7res_80/output_dir/old_but_gold_plane_mil0_b4_init_luna'),
-    ('patients_lst_path', '../datapipeline_final/dsb3_0/interpolate_candidates_res07/ho_patients.lst'), # if False->filter_candidates; if 'interpolate_candidates'->lst and arrays from current dataset is used
+    ('patients_lst_path', './datapipeline_final/dsb3_0/interpolate_candidates_res07/ho_patients.lst'), # if False->filter_candidates; if 'interpolate_candidates'->lst and arrays from current dataset is used
     ('num_augs_per_img', 0),
     ('sample_submission_lst_path', '/'.join(pipe['raw_data_dirs']['dsb3'].split('/')[:-2])  + '/stage2_sample_submission.csv'),
 ])
 gen_submission_3D_05res_80 = OrderedDict([
     ('splitting', 'submission'), # 'validation' or 'submission' or 'holdout'<-not implemented yet
     ('checkpoint_dir', './dsb3_networks/classification/resnet3D_0.5res_80/output_dir/3Dtest_c10_init'),
-    ('patients_lst_path', '../datapipeline_final/dsb3_0/interpolate_candidates_res05/ho_patients.lst'), # if False->filter_candidates; if 'interpolate_candidates'->lst and arrays from current dataset is used
+    ('patients_lst_path', './datapipeline_final/dsb3_0/interpolate_candidates_res05/ho_patients.lst'), # if False->filter_candidates; if 'interpolate_candidates'->lst and arrays from current dataset is used
     ('num_augs_per_img', 0),
     ('sample_submission_lst_path', '/'.join(pipe['raw_data_dirs']['dsb3'].split('/')[:-2])  + '/stage2_sample_submission.csv'),
 ])
 gen_submission_3D_07res_80 = OrderedDict([
     ('splitting', 'submission'), # 'validation' or 'submission' or 'holdout'<-not implemented yet
     ('checkpoint_dir', './dsb3_networks/classification/resnet3D_0.7res_80/output_dir/3Dtest_c10_init'),
-    ('patients_lst_path', '../datapipeline_final/dsb3_0/interpolate_candidates_res07/ho_patients.lst'), # if False->filter_candidates; if 'interpolate_candidates'->lst and arrays from current dataset is used
+    ('patients_lst_path', './datapipeline_final/dsb3_0/interpolate_candidates_res07/ho_patients.lst'), # if False->filter_candidates; if 'interpolate_candidates'->lst and arrays from current dataset is used
     ('num_augs_per_img', 0),
     ('sample_submission_lst_path', '/'.join(pipe['raw_data_dirs']['dsb3'].split('/')[:-2])  + '/stage2_sample_submission.csv'),
 ])
@@ -129,28 +129,28 @@ gen_submission_3D_07res_80 = OrderedDict([
 gen_submission_2D_05res_100 = OrderedDict([
     ('splitting', 'submission'), # 'validation' or 'submission' or 'holdout'<-not implemented yet
     ('checkpoint_dir', './dsb3_networks/classification/resnet2D_0.5res_100/output_dir/old_but_gold_plane_mil0_b4_init_luna'),
-    ('patients_lst_path', '../datapipeline_final/dsb3_0/interpolate_candidates_res05/ho_patients.lst'), # if False->filter_candidates; if 'interpolate_candidates'->lst and arrays from current dataset is used
+    ('patients_lst_path', './datapipeline_final/dsb3_0/interpolate_candidates_res05/ho_patients.lst'), # if False->filter_candidates; if 'interpolate_candidates'->lst and arrays from current dataset is used
     ('num_augs_per_img', 0),
     ('sample_submission_lst_path', '/'.join(pipe['raw_data_dirs']['dsb3'].split('/')[:-2])  + '/stage2_sample_submission.csv'),
 ])
 gen_submission_2D_07res_100 = OrderedDict([
     ('splitting', 'submission'), # 'validation' or 'submission' or 'holdout'<-not implemented yet
     ('checkpoint_dir', './dsb3_networks/classification/resnet2D_0.7res_100/output_dir/old_but_gold_plane_mil0_b4_init_luna'),
-    ('patients_lst_path', '../datapipeline_final/dsb3_0/interpolate_candidates_res07/ho_patients.lst'), # if False->filter_candidates; if 'interpolate_candidates'->lst and arrays from current dataset is used
+    ('patients_lst_path', './datapipeline_final/dsb3_0/interpolate_candidates_res07/ho_patients.lst'), # if False->filter_candidates; if 'interpolate_candidates'->lst and arrays from current dataset is used
     ('num_augs_per_img', 0),
     ('sample_submission_lst_path', '/'.join(pipe['raw_data_dirs']['dsb3'].split('/')[:-2])  + '/stage2_sample_submission.csv'),
 ])
 gen_submission_3D_05res_100 = OrderedDict([
     ('splitting', 'submission'), # 'validation' or 'submission' or 'holdout'<-not implemented yet
     ('checkpoint_dir', './dsb3_networks/classification/resnet3D_0.5res_100/output_dir/3Dtest_c10_init'),
-    ('patients_lst_path', '../datapipeline_final/dsb3_0/interpolate_candidates_res05/ho_patients.lst'), # if False->filter_candidates; if 'interpolate_candidates'->lst and arrays from current dataset is used
+    ('patients_lst_path', './datapipeline_final/dsb3_0/interpolate_candidates_res05/ho_patients.lst'), # if False->filter_candidates; if 'interpolate_candidates'->lst and arrays from current dataset is used
     ('num_augs_per_img', 0),
     ('sample_submission_lst_path', '/'.join(pipe['raw_data_dirs']['dsb3'].split('/')[:-2])  + '/stage2_sample_submission.csv'),
 ])
 gen_submission_3D_07res_100 = OrderedDict([
     ('splitting', 'submission'), # 'validation' or 'submission' or 'holdout'<-not implemented yet
     ('checkpoint_dir', './dsb3_networks/classification/resnet3D_0.7res_100/output_dir/3Dtest_c10_init'),
-    ('patients_lst_path', '../datapipeline_final/dsb3_0/interpolate_candidates_res07/ho_patients.lst'), # if False->filter_candidates; if 'interpolate_candidates'->lst and arrays from current dataset is used
+    ('patients_lst_path', './datapipeline_final/dsb3_0/interpolate_candidates_res07/ho_patients.lst'), # if False->filter_candidates; if 'interpolate_candidates'->lst and arrays from current dataset is used
     ('num_augs_per_img', 0),
     ('sample_submission_lst_path', '/'.join(pipe['raw_data_dirs']['dsb3'].split('/')[:-2])  + '/stage2_sample_submission.csv'),
 ])

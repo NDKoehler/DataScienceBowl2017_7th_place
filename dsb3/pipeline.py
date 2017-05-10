@@ -325,7 +325,7 @@ def _init_patients_by_label():
                 return False
         elif dataset_name == 'dsb3':
             import pandas as pd
-            dsb3_labels = pd.read_csv('../dsb3a_assets/patients_lsts/' + dataset_name + '/stage1_labels_with_solutions.csv') #stage1_labels
+            dsb3_labels = pd.read_csv('./dsb3a_assets/patients_lsts/' + dataset_name + '/stage1_labels_with_solutions.csv') #stage1_labels
             #dsb3_labels = pd.read_csv('/'.join(raw_data_dir.split('/')[:-2]) + '/stage1_labels.csv') #stage1_labels
             try:
                 for label in [1, 0]:
@@ -349,7 +349,7 @@ def _init_patients_by_split(tr_va_ho_split, tr_va_ho_split_file=None):
     if sum(tr_va_ho_split) != 1:
         raise ValueError('tr_va_ho_split has to sum to one!')
     global patients_by_split
-    filename = '../dsb3a_assets/patients_lsts/' + dataset_name + '/stage2_json_' + str(int(tr_va_ho_split[0]*100)) + '/patients_by_split.json' #
+    filename = './dsb3a_assets/patients_lsts/' + dataset_name + '/stage2_json_' + str(int(tr_va_ho_split[0]*100)) + '/patients_by_split.json' #
     if os.path.exists(filename):
         patients_by_split = json.load(open(filename), object_pairs_hook=OrderedDict)
         print('reading split from', filename)

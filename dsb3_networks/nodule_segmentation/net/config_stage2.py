@@ -44,7 +44,7 @@ H['weights_initializer'] = 'xavier_initializer_conv2d'
 H['summary_step'] = 10
 # list iterator
 
-lst_base_path = '../../../datapipeline_final/LUNA16_0/gen_nodule_seg_data/'
+lst_base_path = '../../datapipeline_final/LUNA16_0/gen_nodule_seg_data/'
 H['train_lst'] = lst_base_path + '/tr_nodule_seg_data_DF.csv'
 H['train_npy_path'] = lst_base_path + '/arrays/tr.npy'
 H['val_lst'] = lst_base_path + '/va_nodule_seg_data_DF.csv'

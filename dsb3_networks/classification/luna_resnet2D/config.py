@@ -44,8 +44,8 @@ H['candidate_mode'] = True
 H['importance_sampling'] = True
 H['importance_dict'] = {0: 0.2, 1:1.0}
 #H['importance_dict'] = {0: 1.0, 1:1.0}
-H['train_lst'] = '../../../datapipeline_final/LUNA16_0/interpolate_candidates/tr_candidates_binary.lst' #tr_candidates_binary
-H['val_lst'] = '../../../datapipeline_final/LUNA16_0/interpolate_candidates/va_candidates_binary.lst' #va_candidates_binary
+H['train_lst'] = '../../datapipeline_final/LUNA16_0/interpolate_candidates/tr_candidates_binary.lst' #tr_candidates_binary
+H['val_lst'] = '../../datapipeline_final/LUNA16_0/interpolate_candidates/va_candidates_binary.lst' #va_candidates_binary
 
 # images
 # in_image_shapes[1:] must be equal to len of crop_before_loading_in_RAM_ZminZmaxYminYmaxXminXmax

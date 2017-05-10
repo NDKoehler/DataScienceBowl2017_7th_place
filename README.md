@@ -1,3 +1,6 @@
+###Documentation
+The model description can be found in ./documentation/DL_Munich_model_desc.pdf
+
 ### Operating system
 * Ubuntu 14.04 
 

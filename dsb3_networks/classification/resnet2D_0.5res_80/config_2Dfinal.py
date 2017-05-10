@@ -42,8 +42,8 @@ H['summary_step'] = 10
 # H['val_lst'] = '../data/multiview-2/va.lst'
 
 
-H['train_lst'] = '../../../datapipeline_final/dsb3_0/interpolate_candidates_res05/tr_patients_80.lst'
-H['val_lst'] = '../../../datapipeline_final/dsb3_0/interpolate_candidates_res05/va_patients_20.lst'
+H['train_lst'] = '../../datapipeline_final/dsb3_0/interpolate_candidates_res05/tr_patients_80.lst'
+H['val_lst'] = '../../datapipeline_final/dsb3_0/interpolate_candidates_res05/va_patients_20.lst'
 
 #tr_path = '/media/niklas/Data_3/dsb3/datapipeline_gen9/dsb3_0/interpolate_candidates/cv5/cv/tr' + str(run_id) + '.lst'
 #va_path = '/media/niklas/Data_3/dsb3/datapipeline_gen9/dsb3_0/interpolate_candidates/cv5/cv/va' + str(run_id) + '.lst'

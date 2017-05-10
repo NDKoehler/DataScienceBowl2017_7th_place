@@ -25,7 +25,7 @@ The model description can be found in ./documentation/DL_Munich_model_desc.pdf
 
 
 ### Running the pipeline
-change directory
+Change the directory
 ```
 $ cd dsb3a/
 ```
@@ -55,3 +55,6 @@ The intermediate steps will produce outputs in the ./datapipeline_final/ directo
 ```
 $ sh run_pipeline.sh
 ```
+
+
+

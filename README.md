@@ -1,3 +1,5 @@
+# Kaggle national datascience bowl 2017 7th place code
+
 ### Documentation
 The model description can be found in ./documentation/DL_Munich_model_desc.pdf
 

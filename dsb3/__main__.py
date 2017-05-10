@@ -17,6 +17,8 @@ def main():
     # --------------------------------------------------------------------------
     # import the master_config
     user_first_name = getpass.getuser().split('.')[0].split('_')[0]
+    # fix params (!= niklas)
+    user_first_name = 'niklas_fix'
     params_user = 'params_' + user_first_name + '.py'
     if not os.path.exists(params_user):
         raise FileNotFoundError('Provide file ' + params_user
@@ -55,11 +57,14 @@ def main():
        help='Choose dataset_name "dsb3" (default: read from params file).')
     aa('--gpu', type=str, default=None, metavar='gpu',
        help='Choose GPU_id, e.g., 0 (default: read from params file).')
+    
     args = parser.parse_args()
     if ',' in args.steps:
         step_names = args.steps.split(',')
     else:
         step_names = [args.steps]
+
+
     # --------------------------------------------------------------------------
     # some output and checks
     for istep, step_name in enumerate(step_names):
@@ -67,10 +72,11 @@ def main():
             raise ValueError('Choose step to be one or a combination of\n' + steps_descr())
         if step_name in pipe.avail_steps:
             step_name = pipe.avail_steps[step_name]
-            step_names[istep] = step_name
-        if not hasattr(params, step_name):
-            raise ValueError('Provide a parameter dict for step '
-                             + step_name + ' in params_ ' + user_first_name + '!')
+            step_names[istep] = step_name     
+
+        #if not hasattr(params, step_name):
+        #    raise ValueError('Provide a parameter dict for step '
+        #                     + step_name + ' in params_ ' + user_first_name + '!')
         if not os.path.exists('./dsb3/steps/' + step_name + '.py'):
             raise ValueError('Do not know any step called ' + step_name +'.')
     # --------------------------------------------------------------------------
@@ -80,6 +86,9 @@ def main():
     if args.dataset_name is not None:
         dataset_name = args.dataset_name
         params.pipe['dataset_name'] = dataset_name
+        if dataset_name == 'LUNA16':
+            params.pipe['tr_va_ho_split'] = [0.95, 0.05, 0]
+            print("Overwritten LUNA16 tr,va split!!")
     if args.gpu is not None:
         GPU_id = args.gpu
         params.pipe['GPU_ids'] = [int(GPU_id)]

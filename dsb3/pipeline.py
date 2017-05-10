@@ -133,6 +133,12 @@ def save_json(basename, dictionary, step_name=None, mode='w'):
     with open(filename, 'w') as f:
         json.dump(dictionary, f, indent=4, indent_to_level=1)
 
+def load_json_troll(filename):
+    with open(filename) as f:
+        dictionary = json.load(f, object_pairs_hook=OrderedDict)
+    return dictionary
+
+
 def load_json(basename, step_name=None):
     step_dir = _get_step_dir_for_load(step_name)
     with open(step_dir + basename) as f:
@@ -277,6 +283,14 @@ def _init_patients(_n_patients=0, single_patient_id=None, fromto_patients=None):
     __step_dir_suffix = ''
     if _n_patients > 0:
         patients = patients[:_n_patients]
+        if dataset_name == 'dsb3':
+            patients = ['09ee522a3b7dbea48aa6d39afe240129', 'cb64ff663195832e0b66a9bb17891954', '74b3ef4c2125d636980a19754702dbb9', '4aa3131e76b28e30235664087407edc3',\
+                                'edad5e439ba696b89872f6b9af10cba0', '007c1246c5fe6f200378f6b91323dc2a',\
+                                'e4a87107f94e4a8e32b735d18cef1137', 'eb8d5136918d6859ca3cc3abafe369ac', 'd51dffd06b80ed003aa6095b0639f511', 'd81ab3ad896e4198caed105c469a4817']
+        if dataset_name == 'LUNA16':
+            patients = ['164790817284381538042494285101', '756684168227383088294595834066', '143410010885830403003179808334', '154703816225841204080664115280',\
+                                '908250781706513856628130123235', '922852847124879997825997808179']
+
     elif single_patient_id is not None:
         patients = [single_patient_id]
     elif fromto_patients is not None:
@@ -311,7 +325,8 @@ def _init_patients_by_label():
                 return False
         elif dataset_name == 'dsb3':
             import pandas as pd
-            dsb3_labels = pd.read_csv('/'.join(raw_data_dir.split('/')[:-2]) + '/stage1_labels.csv')
+            dsb3_labels = pd.read_csv('../dsb3a_assets/patients_lsts/' + dataset_name + '/stage1_labels_with_solutions.csv') #stage1_labels
+            #dsb3_labels = pd.read_csv('/'.join(raw_data_dir.split('/')[:-2]) + '/stage1_labels.csv') #stage1_labels
             try:
                 for label in [1, 0]:
                     patients_by_label[label] = dsb3_labels[dsb3_labels['cancer'] == label]['id'].values.tolist()
@@ -334,11 +349,10 @@ def _init_patients_by_split(tr_va_ho_split, tr_va_ho_split_file=None):
     if sum(tr_va_ho_split) != 1:
         raise ValueError('tr_va_ho_split has to sum to one!')
     global patients_by_split
-    filename = '../dsb3a_assets/patients_lsts/' + dataset_name + '/json_' + str(int(tr_va_ho_split[0]*100)) + '/patients_by_split.json'
+    filename = '../dsb3a_assets/patients_lsts/' + dataset_name + '/stage2_json_' + str(int(tr_va_ho_split[0]*100)) + '/patients_by_split.json' #
     if os.path.exists(filename):
         patients_by_split = json.load(open(filename), object_pairs_hook=OrderedDict)
         print('reading split from', filename)
-
     else:
         patients_by_label_split = {}
         for label in [1, 0]:

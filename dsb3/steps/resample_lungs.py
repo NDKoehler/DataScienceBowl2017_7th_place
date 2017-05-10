@@ -80,6 +80,7 @@ def process_junk(junk_cnt, patients_junk, tf_net,
     patients_json = dict(Parallel(n_jobs=min(pipe.n_CPUs, len(patients_junk)), verbose=100)(
                                   delayed(process_patient)(patient, new_spacing_zyx, data_type)
                                   for patient in patients_junk))
+        
     # segmenting lung wings and cropping the scan
     for patient, pa_json in tqdm(patients_json.items()):
         config = json.load(open(checkpoint_dir + '/config.json'))

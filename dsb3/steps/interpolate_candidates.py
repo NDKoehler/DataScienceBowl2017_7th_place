@@ -78,6 +78,18 @@ def run(n_candidates,
                  new_data_type,
                  new_candidates_shape_zyx,
                  new_spacing_zyx)
+    
+    frame = []
+    for lst_type in ['tr', 'va']:
+        #make correct lists
+        data = pd.read_csv(pipe.get_step_dir() + lst_type + '_patients.lst', header=None, sep = '\t')
+        number = 80 if lst_type == 'tr' else 20
+        data.to_csv(pipe.get_step_dir() + lst_type + '_patients_'+str(number)+'.lst', header=None, sep = '\t', index=False)
+        frame.append(data)
+    full = pd.concat(frame, axis = 0)
+    full.to_csv(pipe.get_step_dir() + 'tr_patients_100.lst', header=None, sep = '\t', index=False)
+    full[:50].to_csv(pipe.get_step_dir() + 'va_patients_0.lst', header=None, sep = '\t', index=False)
+    
 
 def gen_data(lst_type,
              img_lst_patients,
@@ -128,7 +140,7 @@ def gen_data(lst_type,
             images_and_prob_maps = np.concatenate([images, prob_maps], axis=4).astype(new_data_type)
             path = pipe.save_array(patient + '.npy', images_and_prob_maps)
             with open(pipe.get_step_dir() + lst_type + '_patients.lst', 'a') as f:
-                f.write('{}\t{}\t{}\n'.format(patient, patient_label, path))
+                f.write('{}\t{}\t{}\n'.format(patient, patient_label, os.path.abspath(path)))
             if pipe.dataset_name == 'LUNA16':
                 with open(pipe.get_step_dir() + lst_type + '_candidates.lst', 'a') as f:
                     for cnt in range(images.shape[0]):
@@ -141,7 +153,10 @@ def gen_data(lst_type,
                             cand_label=cand_label[0]
                         if not cand.startswith(patient):
                             raise ValueError(cand + ' needs to start with ' + patient)
-                        f.write('{}\t{}\t{}\n'.format(cand, cand_label, path))
+                        f.write('{}\t{}\t{}\n'.format(cand, cand_label, os.path.abspath(path)))
+    
+
+
 
 def gen_patients_candidates(line_num,
                             img_lst_patients,

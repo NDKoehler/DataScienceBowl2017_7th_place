@@ -141,6 +141,11 @@ def generate_data_lsts(HU_tissue_range,
             if patient_json['nodule_patient']:
                 nodules = patient_json['nodules']
                 for nodule in nodules:
+                    
+                    #skip nodules < 3 #adjustment for retraining LUNA (checkpoints for this setting already included pretrained in the April 7 model release) 
+                    if nodule['nodule_priority'] < 3:
+                        continue
+                    
                     #nodule_bounding_box_coords_zyx_px = nodule["nodule_box_ymin/ymax_xmin/xmax_zmin/zmax_px"]
                     factor = 1.0
                     nodule_center_zyx_px = nodule['center_zyx_px']

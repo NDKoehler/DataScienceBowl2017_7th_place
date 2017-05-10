@@ -1,4 +1,4 @@
-###Documentation
+### Documentation
 The model description can be found in ./documentation/DL_Munich_model_desc.pdf
 
 ### Operating system
@@ -24,7 +24,7 @@ The model description can be found in ./documentation/DL_Munich_model_desc.pdf
 * scikit-learn 0.18.1
 
 
-###Running the pipeline
+### Running the pipeline
 change directory
 ```
 $ cd dsb3a/
@@ -48,12 +48,8 @@ The GPU ID and number of cores for multithreading can be adjusted in line 23,24 
 ('GPU_ids', [0]),
 
 
-###(optional) test with 10 patients for quick debugging
-```
-$ sh test_pipeline.sh
-```
 
-###Run the entire pipeline, this will produce the 2 private LB submissions from team DL_Munich, exspected running time ~96hours
+### Run the entire pipeline
 The intermediate steps will produce outputs in the ./datapipeline_final/ directory. The final 2 submissions will be placed in the ./dsb3a/out/ directory.
 
 ```

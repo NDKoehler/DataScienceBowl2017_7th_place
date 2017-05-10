@@ -23,7 +23,6 @@ python3.4 enforce_ordering.py
 cd ./dsb3_networks/classification/resnet2D_0.5res_100/
 python3.4 run.py
 
-
 cd ../resnet2D_0.7res_100/
 python3.4 run.py
 cd ../resnet3D_0.5res_100/

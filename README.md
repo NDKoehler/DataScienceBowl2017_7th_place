@@ -52,7 +52,11 @@ The GPU ID and number of cores for multithreading can be adjusted in line 23,24 
 
 
 ### Run the entire pipeline
-The intermediate steps will produce outputs in the ./datapipeline_final/ directory. The final 2 submissions will be placed in the ./dsb3a/out/ directory.
+Download the checkpoint folder from:
+https://www.dropbox.com/sh/70dvei9ie7fpwpa/AADTU8pc8T5TzII38j5kstroa?dl=0
+and extract it to the ./ directory
+
+The intermediate steps will produce outputs in the ./datapipeline_final/ directory. The final 2 submissions will be placed in the ./out/ directory.
 
 ```
 $ sh run_pipeline.sh

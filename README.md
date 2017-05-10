@@ -26,12 +26,7 @@ The model description can be found in ./documentation/DL_Munich_model_desc.pdf
 * scikit-learn 0.18.1
 
 
-### Running the pipeline
-Change the directory
-```
-$ cd dsb3a/
-```
-
+### Preparing the data
 adjust raw_data_absolute_path in "params_niklas_fix.py" (line 6) to the raw dsb3 data directory. The raw dsb3 data directory is expected to contain the following folders and files:
 * stage1/    (unzipped stage1.7z)
 * stage2/    (unzipped stage2.7z)
@@ -50,12 +45,12 @@ The GPU ID and number of cores for multithreading can be adjusted in line 23,24 
 ('GPU_ids', [0]),
 
 
-
-### Run the entire pipeline
 Download the checkpoint folder from:
 https://www.dropbox.com/sh/70dvei9ie7fpwpa/AADTU8pc8T5TzII38j5kstroa?dl=0
 and extract it to the ./ directory
 
+
+### Running entire pipeline
 The intermediate steps will produce outputs in the ./datapipeline_final/ directory. The final 2 submissions will be placed in the ./out/ directory.
 
 ```
